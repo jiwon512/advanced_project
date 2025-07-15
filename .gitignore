@@ -1,0 +1,20 @@
+# 가상환경 폴더
+venv/
+env/
+
+# 파이썬 캐시 파일
+__pycache__/
+*.pyc
+
+# Jupyter Notebook 체크포인트
+.ipynb_checkpoints/
+
+# macOS 시스템 파일
+.DS_Store
+
+# IDE 설정 파일 (옵션)
+.vscode/
+.idea/
+
+# 기타 올리고 싶지 않은 파일
+*.log
