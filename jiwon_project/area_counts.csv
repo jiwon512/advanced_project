@@ -1,0 +1,222 @@
+neighbourhood_group_cleansed,neighbourhood_cleansed,count
+Bronx,Allerton,35
+Bronx,Baychester,11
+Bronx,Belmont,22
+Bronx,Bronxdale,11
+Bronx,Castle Hill,8
+Bronx,City Island,12
+Bronx,Claremont Village,48
+Bronx,Clason Point,33
+Bronx,Co-op City,6
+Bronx,Concourse,31
+Bronx,Concourse Village,26
+Bronx,Country Club,2
+Bronx,East Morrisania,4
+Bronx,Eastchester,10
+Bronx,Edenwald,23
+Bronx,Fieldston,8
+Bronx,Fordham,30
+Bronx,Highbridge,16
+Bronx,Hunts Point,16
+Bronx,Kingsbridge,36
+Bronx,Longwood,30
+Bronx,Melrose,17
+Bronx,Morris Heights,11
+Bronx,Morris Park,34
+Bronx,Morrisania,8
+Bronx,Mott Haven,46
+Bronx,Mount Eden,5
+Bronx,Mount Hope,28
+Bronx,North Riverdale,6
+Bronx,Norwood,25
+Bronx,Olinville,3
+Bronx,Parkchester,15
+Bronx,Pelham Bay,9
+Bronx,Pelham Gardens,27
+Bronx,Port Morris,42
+Bronx,Riverdale,3
+Bronx,Schuylerville,15
+Bronx,Soundview,11
+Bronx,Spuyten Duyvil,5
+Bronx,Throgs Neck,31
+Bronx,Tremont,10
+Bronx,Unionport,13
+Bronx,University Heights,5
+Bronx,Van Nest,10
+Bronx,Wakefield,59
+Bronx,West Farms,4
+Bronx,Westchester Square,8
+Bronx,Williamsbridge,38
+Bronx,Woodlawn,6
+Brooklyn,Bath Beach,18
+Brooklyn,Bay Ridge,64
+Brooklyn,Bedford-Stuyvesant,1545
+Brooklyn,Bensonhurst,26
+Brooklyn,Bergen Beach,15
+Brooklyn,Boerum Hill,66
+Brooklyn,Borough Park,28
+Brooklyn,Brighton Beach,42
+Brooklyn,Brooklyn Heights,47
+Brooklyn,Brownsville,62
+Brooklyn,Bushwick,758
+Brooklyn,Canarsie,188
+Brooklyn,Carroll Gardens,76
+Brooklyn,Clinton Hill,178
+Brooklyn,Cobble Hill,27
+Brooklyn,Columbia St,5
+Brooklyn,Coney Island,19
+Brooklyn,Crown Heights,648
+Brooklyn,Cypress Hills,137
+Brooklyn,DUMBO,18
+Brooklyn,Downtown Brooklyn,40
+Brooklyn,Dyker Heights,9
+Brooklyn,East Flatbush,397
+Brooklyn,East New York,254
+Brooklyn,Flatbush,263
+Brooklyn,Flatlands,77
+Brooklyn,Fort Greene,139
+Brooklyn,Fort Hamilton,66
+Brooklyn,Gerritsen Beach,2
+Brooklyn,Gowanus,84
+Brooklyn,Gravesend,41
+Brooklyn,Greenpoint,297
+Brooklyn,Kensington,48
+Brooklyn,Manhattan Beach,5
+Brooklyn,Midwood,40
+Brooklyn,Mill Basin,14
+Brooklyn,Navy Yard,3
+Brooklyn,Park Slope,161
+Brooklyn,Prospect Heights,88
+Brooklyn,Prospect-Lefferts Gardens,159
+Brooklyn,Red Hook,27
+Brooklyn,Sea Gate,16
+Brooklyn,Sheepshead Bay,86
+Brooklyn,South Slope,88
+Brooklyn,Sunset Park,158
+Brooklyn,Vinegar Hill,18
+Brooklyn,Williamsburg,853
+Brooklyn,Windsor Terrace,55
+Manhattan,Battery Park City,36
+Manhattan,Chelsea,520
+Manhattan,Chinatown,185
+Manhattan,Civic Center,8
+Manhattan,East Harlem,424
+Manhattan,East Village,488
+Manhattan,Financial District,340
+Manhattan,Flatiron District,46
+Manhattan,Gramercy,167
+Manhattan,Greenwich Village,76
+Manhattan,Harlem,1031
+Manhattan,Hell's Kitchen,1036
+Manhattan,Inwood,88
+Manhattan,Kips Bay,264
+Manhattan,Little Italy,75
+Manhattan,Lower East Side,342
+Manhattan,Marble Hill,5
+Manhattan,Midtown,1461
+Manhattan,Morningside Heights,63
+Manhattan,Murray Hill,329
+Manhattan,NoHo,18
+Manhattan,Nolita,104
+Manhattan,Roosevelt Island,24
+Manhattan,SoHo,162
+Manhattan,Stuyvesant Town,30
+Manhattan,Theater District,279
+Manhattan,Tribeca,108
+Manhattan,Two Bridges,14
+Manhattan,Upper East Side,1042
+Manhattan,Upper West Side,929
+Manhattan,Washington Heights,289
+Manhattan,West Village,222
+Queens,Arverne,69
+Queens,Astoria,290
+Queens,Bay Terrace,3
+Queens,Bayside,33
+Queens,Bayswater,6
+Queens,Belle Harbor,7
+Queens,Bellerose,14
+Queens,Breezy Point,4
+Queens,Briarwood,30
+Queens,Cambria Heights,32
+Queens,College Point,37
+Queens,Corona,50
+Queens,Ditmars Steinway,114
+Queens,Douglaston,5
+Queens,East Elmhurst,131
+Queens,Edgemere,13
+Queens,Elmhurst,123
+Queens,Far Rockaway,48
+Queens,Flushing,297
+Queens,Forest Hills,62
+Queens,Fresh Meadows,26
+Queens,Glendale,53
+Queens,Hollis,12
+Queens,Holliswood,2
+Queens,Howard Beach,28
+Queens,Jackson Heights,107
+Queens,Jamaica,219
+Queens,Jamaica Estates,15
+Queens,Jamaica Hills,16
+Queens,Kew Gardens,23
+Queens,Kew Gardens Hills,18
+Queens,Laurelton,28
+Queens,Little Neck,5
+Queens,Long Island City,243
+Queens,Maspeth,63
+Queens,Middle Village,16
+Queens,Neponsit,2
+Queens,Ozone Park,64
+Queens,Queens Village,62
+Queens,Rego Park,39
+Queens,Richmond Hill,71
+Queens,Ridgewood,208
+Queens,Rockaway Beach,49
+Queens,Rosedale,69
+Queens,South Ozone Park,54
+Queens,Springfield Gardens,94
+Queens,St. Albans,111
+Queens,Sunnyside,132
+Queens,Whitestone,14
+Queens,Woodhaven,70
+Queens,Woodside,139
+Staten Island,Arden Heights,3
+Staten Island,Arrochar,10
+Staten Island,Bull's Head,8
+Staten Island,Castleton Corners,4
+Staten Island,"Chelsea, Staten Island",1
+Staten Island,Clifton,8
+Staten Island,Concord,4
+Staten Island,Dongan Hills,3
+Staten Island,Eltingville,2
+Staten Island,Emerson Hill,5
+Staten Island,Fort Wadsworth,1
+Staten Island,Graniteville,5
+Staten Island,Grant City,9
+Staten Island,Great Kills,5
+Staten Island,Grymes Hill,3
+Staten Island,Howland Hook,2
+Staten Island,Huguenot,2
+Staten Island,Lighthouse Hill,2
+Staten Island,Mariners Harbor,23
+Staten Island,Midland Beach,9
+Staten Island,New Brighton,10
+Staten Island,New Dorp Beach,3
+Staten Island,New Springville,2
+Staten Island,Oakwood,1
+Staten Island,Port Richmond,11
+Staten Island,Prince's Bay,6
+Staten Island,Randall Manor,19
+Staten Island,Rosebank,6
+Staten Island,Rossville,3
+Staten Island,Shore Acres,9
+Staten Island,Silver Lake,4
+Staten Island,South Beach,9
+Staten Island,St. George,33
+Staten Island,Stapleton,14
+Staten Island,Todt Hill,5
+Staten Island,Tompkinsville,38
+Staten Island,Tottenville,5
+Staten Island,West Brighton,22
+Staten Island,Westerleigh,4
+Staten Island,Willowbrook,1
+Staten Island,Woodrow,2
