@@ -4,30 +4,41 @@ import seaborn as sns
 import re
 from sklearn.preprocessing import OneHotEncoder
 
+'''
+room_info = ['id', 'host_id', 'property_type', 'room_type', 'accommodates',
+        'bathrooms', 'bathrooms_text', 'beds', 'price',
+        'is_shared', 'is_private', 'bath_score_mul', 'structure_type',
+        'structure_category']
+
+room_info_filter = ['id', 'host_id', 'room_type', 'structure_type', 'structure_category'
+        ,'accommodates', 'bath_score_mul', 'beds', 'price']
+
+'''
+
 # ```room_info``` columns select
 room_info = ['id', 'host_id', 'price',
              'property_type', 'room_type', 'accommodates', 'bathrooms', 'bathrooms_text', 'beds', 'amenities']
 
-room_df = pd.read_csv('2025_Airbnb_NYC.csv', usecols = room_info, encoding = 'utf-8' )
+df = pd.read_csv('2025_Airbnb_NYC.csv', usecols = room_info, encoding = 'utf-8' )
 
 
 # --- Shared preprocessing code ---
 # Convert "id" from float to int, "price" from object to float
-room_df['id'] = room_df['id'].astype(int)
+df['id'] = df['id'].astype(int)
 
-room_df['price'] = room_df['price'].str.replace(r'[\$,]', '', regex=True)
-room_df['price'] = room_df['price'].astype(float)
+df['price'] = df['price'].str.replace(r'[\$,]', '', regex=True)
+df['price'] = df['price'].astype(float)
 
 
 # --- Personal preprocessing code ---
 # Convert "beds" from float to int
 # Replace missing or non-bed values with median (assumed 1)
-room_df['beds'] = room_df['beds'].fillna(0).astype(int)
-room_df['beds'] = room_df['beds'].replace(0, 1)
+df['beds'] = df['beds'].fillna(0).astype(int)
+df['beds'] = df['beds'].replace(0, 1)
 
 # Clean up "bathrooms", "bathrooms_text" column:
 # - Replace invalid or missing values with median (assumed 1)
-room_df['bathrooms'] = room_df['bathrooms'].fillna(0)
+df['bathrooms'] = df['bathrooms'].fillna(0)
 
 def parse_baths(text):
     if pd.isna(text):
@@ -40,30 +51,30 @@ def parse_baths(text):
         return 0.5
     return np.nan
 
-room_df['bathrooms_parsed'] = room_df['bathrooms_text'].apply(parse_baths)
-mask_mismatch = room_df['bathrooms_parsed'].notna() & (room_df['bathrooms'] != room_df['bathrooms_parsed'])
-room_df.loc[mask_mismatch, 'bathrooms'] = room_df.loc[mask_mismatch, 'bathrooms_parsed']
-room_df = room_df.drop(columns=['bathrooms_parsed'])
+df['bathrooms_parsed'] = df['bathrooms_text'].apply(parse_baths)
+mask_mismatch = df['bathrooms_parsed'].notna() & (df['bathrooms'] != df['bathrooms_parsed'])
+df.loc[mask_mismatch, 'bathrooms'] = df.loc[mask_mismatch, 'bathrooms_parsed']
+df = df.drop(columns=['bathrooms_parsed'])
 
-room_df['bathrooms_text'] = room_df['bathrooms_text'].fillna(0)
+df['bathrooms_text'] = df['bathrooms_text'].fillna(0)
 
-room_df['is_shared'] = room_df['bathrooms_text'] \
+df['is_shared'] = df['bathrooms_text'] \
     .str.contains('shared', case=False, na=False)
 
-room_df['is_private'] = ~room_df['is_shared']
+df['is_private'] = ~df['is_shared']
 
 w_private = 1.0   # 전용 욕실 가중치
 w_shared  = 0.5   # 공용 욕실 가중치
 
-room_df['bath_score_mul'] = (
-    room_df['bathrooms'] * np.where(room_df['is_private'], w_private, w_shared)
+df['bath_score_mul'] = (
+    df['bathrooms'] * np.where(df['is_private'], w_private, w_shared)
 )
 
-room_df['bathrooms'] = room_df['bathrooms'].replace(0.00, 1)
-room_df['bath_score_mul'] = room_df['bath_score_mul'].replace(0.00, 1)
+df['bathrooms'] = df['bathrooms'].replace(0.00, 1)
+df['bath_score_mul'] = df['bath_score_mul'].replace(0.00, 1)
 
 # Clean up "room_type", "property_type" column:
-# 
+#
 def extract_structure(pt):
     pt_l = pt.strip().lower()
     if ' in ' in pt_l:
@@ -76,14 +87,14 @@ def extract_structure(pt):
         return pt_l.replace('shared room','').strip()
     return pt_l
 
-rt_cats = set(room_df['room_type'].str.strip().str.lower())
-room_df['structure_type'] = room_df['property_type'].apply(lambda x: (
+rt_cats = set(df['room_type'].str.strip().str.lower())
+df['structure_type'] = df['property_type'].apply(lambda x: (
     x.strip().lower() if x.strip().lower() not in rt_cats
     else pd.NA
 ))
 
-mask = room_df['structure_type'].notna()
-room_df.loc[mask, 'structure_type'] = room_df.loc[mask, 'structure_type'].apply(extract_structure)
+mask = df['structure_type'].notna()
+df.loc[mask, 'structure_type'] = df.loc[mask, 'structure_type'].apply(extract_structure)
 
 residential = {
     'rental unit','home','condo','townhouse','cottage',
@@ -112,16 +123,6 @@ def map_category(row):
     else:
         return 'Others'
 
-room_df['structure_category'] = room_df.apply(map_category, axis=1)
+df['structure_category'] = df.apply(map_category, axis=1)
 
-
-'''
-room_info = ['id', 'host_id', 'property_type', 'room_type', 'accommodates',
-        'bathrooms', 'bathrooms_text', 'beds', 'price',
-        'is_shared', 'is_private', 'bath_score_mul', 'structure_type',
-        'structure_category']
-
-room_info_filter = ['id', 'host_id', 'room_type', 'structure_type', 'structure_category'
-        ,'accommodates', 'bath_score_mul', 'beds', 'price']
-
-'''
+print(df.head(2))
