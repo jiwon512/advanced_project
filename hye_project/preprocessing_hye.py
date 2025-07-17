@@ -124,5 +124,3 @@ def map_category(row):
         return 'Others'
 
 df['structure_category'] = df.apply(map_category, axis=1)
-
-print(df.head(2))
