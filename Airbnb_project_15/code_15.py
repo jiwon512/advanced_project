@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import re
 
 
-df = pd.read_csv('/Users/Jiwon/Documents/GitHub/advanced_project/jiwon_project/csv_files/NY_Airbnb_original_df.csv', index_col=0)
+df = pd.read_csv('/Users/Jiwon/Documents/GitHub/advanced_project/jiwon_project/csv_files/NY_Airbnb_original_df.csv')
 
 # 전처리 1 - id int로 변경
 df['id'] = df['id'].astype(int)
