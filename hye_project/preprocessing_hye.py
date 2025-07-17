@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import re
-from sklearn.preprocessing import OneHotEncoder
 
 '''
 room_info = ['id', 'host_id', 'property_type', 'room_type', 'accommodates',
@@ -74,7 +73,6 @@ df['bathrooms'] = df['bathrooms'].replace(0.00, 1)
 df['bath_score_mul'] = df['bath_score_mul'].replace(0.00, 1)
 
 # Clean up "room_type", "property_type" column:
-#
 def extract_structure(pt):
     pt_l = pt.strip().lower()
     if ' in ' in pt_l:
