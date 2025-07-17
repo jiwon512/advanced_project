@@ -1,0 +1,23 @@
+# 필요한 리뷰 관련 컬럼 리스트 정의
+review_columns = [
+    'id', 'host_id',
+    'number_of_reviews', 'number_of_reviews_ltm', 'number_of_reviews_l30d',
+    'reviews_per_month',
+    'review_scores_rating', 'review_scores_accuracy', 'review_scores_cleanliness',
+    'review_scores_checkin', 'review_scores_communication', 'review_scores_location',
+    'review_scores_value'
+]
+
+# 전처리: 컬럼 선택 후, 리뷰 스코어 결측치를 각 컬럼 평균으로 대체
+review_df = (
+    df[review_columns]
+    .copy()
+    .assign(**{
+        col: df[col].fillna(df[col].mean())
+        for col in [
+            'review_scores_rating', 'review_scores_accuracy', 'review_scores_cleanliness',
+            'review_scores_checkin', 'review_scores_communication',
+            'review_scores_location', 'review_scores_value'
+        ]
+    })
+)
