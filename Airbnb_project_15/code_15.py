@@ -144,7 +144,7 @@ df['host_location_ny'] = df['host_location'].str.contains('New York', na=False).
 
 
 
-#rooms_info
+# === rooms_info ===
 # --- Personal preprocessing code ---
 # Convert "beds" from float to int
 # Replace missing or non-bed values with median (assumed 1)
@@ -189,7 +189,6 @@ df['bathrooms'] = df['bathrooms'].replace(0.00, 1)
 df['bath_score_mul'] = df['bath_score_mul'].replace(0.00, 1)
 
 # Clean up "room_type", "property_type" column:
-#
 def extract_structure(pt):
     pt_l = pt.strip().lower()
     if ' in ' in pt_l:
@@ -210,8 +209,9 @@ df['structure_type'] = df['property_type'].apply(lambda x: (
 
 mask = df['structure_type'].notna()
 df.loc[mask, 'structure_type'] = df.loc[mask, 'structure_type'].apply(extract_structure)
+df['structure_type'] = df['structure_type'].fillna('rental unit')
 
-residential = {
+'''residential = {
     'rental unit','home','condo','townhouse','cottage',
     'bungalow','villa','vacation home','earthen home',
     'ranch','casa particular','tiny home','entire home/apt'
@@ -238,7 +238,7 @@ def map_category(row):
     else:
         return 'Others'
 
-df['structure_category'] = df.apply(map_category, axis=1)
+df['structure_category'] = df.apply(map_category, axis=1)'''
 
 
 for col in [
@@ -256,8 +256,7 @@ booking_cols = ['price', 'estimated_occupancy_l365d', 'estimated_revenue_l365d',
 amenities_cols = ['amenities', 'amenities_cnt']
 room_cols = ['property_type', 'room_type', 'accommodates',
         'bathrooms', 'bathrooms_text', 'beds',
-        'is_shared', 'is_private', 'bath_score_mul', 'structure_type',
-        'structure_category']
+        'is_shared', 'is_private', 'bath_score_mul', 'structure_type']
 host_cols = ['id','host_id','name','name_length','name_length_group','description','description_length',
     'description_length_group','neighborhood_overview','neighborhood_overview_exists', 'host_about','host_about_length','host_about_length_group','host_is_superhost',
     'host_has_profile_pic','host_identity_verified','host_response_time','host_response_time_score','host_response_rate',
@@ -275,7 +274,7 @@ print(df)
 loc_cols_filter = ['neighbourhood_cleansed', 'neighbourhood_group_cleansed', 'latitude', 'longitude']
 booking_cols_filter = ['price', 'estimated_occupancy_l365d', 'estimated_revenue_l365d', 'availability_60', 'availability_365', 'instant_bookable', 'is_long_term']
 amenities_cols = ['amenities', 'amenities_cnt']
-room_cols_filter = ['room_type', 'structure_type', 'structure_category','accommodates', 'bath_score_mul', 'beds']
+room_cols_filter = ['room_type', 'structure_type', 'accommodates', 'bath_score_mul', 'beds']
 reviews_cols_filter =  ['number_of_reviews', 'number_of_reviews_ltm', 'number_of_reviews_l30d', 'review_scores_rating', 'review_scores_accuracy', 'review_scores_cleanliness',
     'review_scores_checkin', 'review_scores_communication', 'review_scores_location', 'review_scores_value']
 host_cols_filter = ['id','host_id','name_length_group','description_length_group','neighborhood_overview_exists','host_about_length_group','host_is_superhost',
