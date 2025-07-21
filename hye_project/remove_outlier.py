@@ -275,6 +275,8 @@ print(f"Original rows: {len(df)}, Without outliers: {len(outlier_removed_df)}")
 if 'Unnamed: 0' in df.columns:
     df = df.drop(columns=['Unnamed: 0'])
 
+df = df.loc[~df['is_outlier']].reset_index(drop=True)
+
 df = df.drop(columns=['median', 'lower', 'upper', 'n', 'is_outlier'])
 df['room_new_type'] = df['room_new_type'].str.lower()
 
