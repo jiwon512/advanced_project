@@ -43,6 +43,7 @@ import networkx as nx
 
 class normality:
     # 정규성 검정 결과
+    @staticmethod
     def test(
         series: pd.Series,
         alpha: float = 0.05,
@@ -122,6 +123,7 @@ class normality:
 
 
     # 정규성 검정 결과 표 형식으로 정리
+    @staticmethod
     def print_normality(
         results: Dict[str, Any],
         ad_res: Any,
@@ -208,6 +210,7 @@ class normality:
 
 class stat_test:
     # 가설검정 방식 추천 함수
+    @staticmethod
     def decide(
             df: pd.DataFrame,
             X: str,
@@ -382,6 +385,7 @@ class stat_test:
         }
 
     # Kruskal 검정과 Dunn 사후 검정까지 진행
+    @staticmethod
     def kruskal_dunn(
         df: pd.DataFrame,
         X: str,
@@ -533,6 +537,7 @@ class stat_test:
         }
 
     # 카이제곱 독립성 검정
+    @staticmethod
     def chi2_assoc(
         df: pd.DataFrame,
         X: str,
@@ -631,6 +636,7 @@ class stat_test:
             'resid_std': resid_std,
         }
 
+    @staticmethod
     def p_heatmap(
             pmat: pd.DataFrame,
             alpha: float = 0.05,
@@ -764,6 +770,7 @@ class stat_test:
         return fig, ax
 
 class outlier:
+    @staticmethod
     def robust_bounds(df, group_col, val_col, k=3):
         out = []
         for g, s in df.groupby(group_col)[val_col]:
@@ -776,6 +783,7 @@ class outlier:
             out.append((g, med, lower, upper, len(vals)))
         return pd.DataFrame(out, columns=[group_col, 'median', 'lower', 'upper', 'n'])
 
+    @staticmethod
     def compute_iqr_bounds(
             series: pd.Series,
             factor: float = 1.5
@@ -794,6 +802,7 @@ class outlier:
         iqr = q3 - q1
         return q1 - factor * iqr, q3 + factor * iqr
 
+    @staticmethod
     def stats(
             series: pd.Series,
             factor: float = 1.5
@@ -817,6 +826,7 @@ class outlier:
             'outlier_ratio': float(mask.mean())
         })
 
+    @staticmethod
     def describe_without(
             series: pd.Series,
             factor: float = 1.5
@@ -835,6 +845,7 @@ class outlier:
         filtered = series[(series >= lower) & (series <= upper)]
         return filtered.describe()
 
+    @staticmethod
     def is_not(
             series: pd.Series,
             factor: float = 1.5
@@ -852,6 +863,7 @@ class outlier:
         lower, upper = outlier.compute_iqr_bounds(series, factor)
         return (series >= lower) & (series <= upper)
 
+    @staticmethod
     def boxplot(
             df: pd.DataFrame,
             X: str,
@@ -879,6 +891,33 @@ class outlier:
         """
         # 1. 그룹별 이상치 통계 수집
         stats_list = []
+        for g in df[X].dropna().unique():
+            series = pd.to_numeric(df.loc[df[X] == g, y], errors='coerce')
+            # compute outlier stats
+            st = outlier.stats(series, factor)
+            stats_list.append({X: g, **st.to_dict()})
+        stats_df = pd.DataFrame(stats_list)
+
+        # 2. 이상치 통계 출력
+        if verbose:
+            print(f"\n[Groups outlier statistics (factor={factor})]")
+            print(tabulate(stats_df, headers='keys', tablefmt=tablefmt, showindex=False))
+
+        # 3. 박스플롯 그리기
+        plt.figure(figsize=figsize)
+        sns.boxplot(
+            x=X,
+            y=y,
+            data=df,
+            whis=factor,
+            showfliers=True
+        )
+        plt.title(f"Boxplot of {y} by {X} (IQR*{factor})")
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+        plt.show()
+
+
         for g in df[X].dropna().unique():
             series = pd.to_numeric(df.loc[df[X] == g, y], errors='coerce')
             # compute outlier stats
