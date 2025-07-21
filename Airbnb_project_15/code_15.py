@@ -249,6 +249,25 @@ for col in [
     df[col].fillna(df[col].mean(), inplace=True)
     df[col] = df[col].round(2)
 
+# host_since 년도로 바꾸기, 결측치 비율 0.09%-> 0으로 
+df['host_since'] = pd.to_datetime(df['host_since'], errors='coerce')
+df['host_since'] = df['host_since'].dt.year
+df['host_since'] = df['host_since'].fillna(0).astype(int)
+df['host_since'] = df['host_since'].astype(int)
+
+# last_review 년도로 바꾸기, 결측치 비율 30% -> 0으로
+df['last_review'] = pd.to_datetime(df['last_review'], errors='coerce')
+df['last_review'] = df['last_review'].dt.year
+df['last_review'] = df['last_review'].fillna(0).astype(int)
+df['last_review'] = df['last_review'].astype(int)
+
+# 비활성화 조건
+cond1 = (df['last_review'] <= 2022) & (df['last_review'] != 0) & (df['estimated_occupancy_l365d'] == 0)
+cond2 = (df['host_since'] <= 2022) & (df['number_of_reviews'] == 0) & (df['estimated_occupancy_l365d'] == 0)
+
+# 활성화=1 비활성화=0
+df['is_activate'] = np.select([cond1, cond2], [0, 0], default=1)
+
 
 # list 정리
 loc_cols = ['neighbourhood_cleansed', 'neighbourhood_group_cleansed', 'latitude', 'longitude']
