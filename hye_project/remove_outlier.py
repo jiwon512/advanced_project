@@ -1,158 +1,274 @@
-import pandas as pd
-import numpy as np
-from typing import Any, Dict
+from hye_project.my_package.stat_file import normality, stat_test, outlier
 
-import seaborn as sns
+# -------
+# library
+# -------
+
+# Standard library
+from itertools import combinations
+
+# Typing
+from typing import Any, Dict, Tuple, Union
+
+# Data handling
+import numpy as np
+import pandas as pd
+
+# Visualization
 import matplotlib.pyplot as plt
+import seaborn as sns
+from IPython.display import display
+
+# Reporting
 from tabulate import tabulate
 
-from itertools import combinations
-from scipy.spatial.distance import squareform
+# Statistical analysis
 import scipy.stats as stats
+from scipy.stats import levene
+from scipy.spatial.distance import squareform
+
+# Clustering
 import scipy.cluster.hierarchy as sch
+
+# Post-hoc tests
 import scikit_posthocs as sp
+
+# Modeling
 import statsmodels.api as sm
+
+# Network analysis
 import networkx as nx
 
+# ------------------------------
+# 전처리를 완료한 csv 파일 불러오기
+# ------------------------------
+df = pd.read_csv('/Users/hyeom/Documents/GitHub/advanced_project/jiwon_project/csv_files/preprocessing_filtered.csv')
 
-def test_normality(
-    series: pd.Series,
-    alpha: float = 0.05,
-    verbose: bool = True
-) -> Dict[str, Any]:
-    """
-    주어진 수치형 시리즈에 대해 여러 정규성 검정을 수행하고 결과를 딕셔너리로 반환합니다.
+# ------------------------------
+# price 컬럼 정규성 및 분포 확인하기
+# ------------------------------
+# 1. price 컬럼 정규성 검정 결과 / QQ plot 시각화
+print('=== price 정규성 검정 ===')
+price_normality = normality.test(df['price']);
 
-    Args:
-        series: pandas Series, numeric 데이터 (NaN은 자동 제거)
-        alpha: 유의수준 (p-value 비교 기준)
-        verbose: True일 경우 결과 요약을 콘솔에 출력
+plt.figure(figsize=(8, 6))
+stats.probplot(df['price'], dist="norm", plot=plt)
+plt.title("Price QQ-Plot")
+plt.xlabel("Theoretical Quantiles")
+plt.ylabel("Sample Quantiles")
+plt.tight_layout()
+plt.show()
 
-    Returns:
-        Dict[str, Any]:
-            {
-                'n': 표본 수,
-                'skew': 왜도,
-                'kurt_excess': 초과 첨도,
-                'dagostino_k2': D’Agostino K² 통계량,
-                'dagostino_p': D’Agostino K² p-value,
-                'jarque_bera': Jarque–Bera 통계량,
-                'jarque_bera_p': Jarque–Bera p-value,
-                'anderson_stat': Anderson–Darling 통계량,
-                'anderson_crit': {유의수준: 임계값, ...},
-                'lilliefors_stat': Lilliefors KS 통계량,
-                'lilliefors_p': Lilliefors p-value,
-                'practical_normal': 실무적 판정 (skew<0.5 & |kurt|<1)
-            }
-    """
-    # 1. 데이터 전처리
-    arr = pd.to_numeric(series, errors='coerce').dropna().values
-    n = arr.size
+# 2. price가 이상치로 인해 정규성을 따르지 않기 때문에, log_price 컬럼 추가
+df['log_price'] = np.log1p(df['price'])
 
-    # 2. 기초 통계량
-    skewness = stats.skew(arr, bias=False)
-    kurt_excess = stats.kurtosis(arr, fisher=True, bias=False)
+print('=== log price 정규성 검정 ===')
+log_price_normality = normality.test(df['log_price']);
 
-    # 3. 정규성 검정들
-    k2_stat, k2_p = stats.normaltest(arr)
-    jb_stat, jb_p = stats.jarque_bera(arr)
-    ad_res = stats.anderson(arr, dist='norm')
-    ks_stat, ks_p = sm.stats.diagnostic.kstest_normal(arr)
+plt.figure(figsize=(8, 6))
+stats.probplot(df['log_price'], dist="norm", plot=plt)
+plt.title("Log Price QQ-Plot")
+plt.xlabel("Theoretical Quantiles")
+plt.ylabel("Sample Quantiles")
+plt.tight_layout()
+plt.show()
 
-    # 4. 실무적 판정
-    practical = (abs(skewness) < 0.5) and (abs(kurt_excess) < 1)
+print('\n[이상치 제거 전 price describe]')
+print(df['price'].describe())
 
-    # 5. 결과 집계
-    results: Dict[str, Any] = {
-        'n': n,
-        'skew': skewness,
-        'kurt_excess': kurt_excess,
-        'dagostino_k2': k2_stat,
-        'dagostino_p': k2_p,
-        'jarque_bera': jb_stat,
-        'jarque_bera_p': jb_p,
-        'anderson_stat': ad_res.statistic,
-        'anderson_crit': dict(zip(ad_res.significance_level, ad_res.critical_values)),
-        'lilliefors_stat': ks_stat,
-        'lilliefors_p': ks_p,
-        'practical_normal': practical
-    }
+# -> log_price도 정규성을 띄진 않지만, 왜도 0.57, 첨도 1.04로 정규성을 띄고 있다고 가정
+# -> log_price를 기준으로 이상치 제거 기준을 가설 검정을 통해 찾고, 이상치를 제거
 
-    if verbose:
-        print_normality(results, ad_res)
+# ------------------------------
+# 이상치를 정의할 기준 컬럼 찾기
+# 1) room_type과 price의 연관성
+# ------------------------------
+X1 = 'room_type'
+y = 'log_price'
+alpha = 0.05
+max_shapiro_n = 5000
 
-    return results
+print('\n=== room type 과 price 연관성 가설 검정 ===')
+# 1. 정규성과 등분산성 검정 후, Kruskal-Wallis 검정 진행
+X1_stat_test = stat_test.decide(df, X1, y, alpha=alpha, verbose=True);
 
-def print_normality(
-    results: Dict[str, Any],
-    ad_res: Any,
-    alpha: float = 0.05
-) -> None:
-    """
-    정규성 검정 결과를 표 형식으로 출력합니다.
+# 2. Kruskal-Wallis 검정 진행, 사후 검정은 Dunn(holm 보정)
+X1_res = stat_test.kruskal_dunn(df, X1, y, alpha=alpha, adjust='holm', verbose=True);
 
-    Args:
-        results: assess_normality()가 반환한 결과 딕셔너리
-        ad_res: stats.anderson()의 반환 객체
-        alpha: 유의수준 (default=0.05)
-    """
-    table = []
-    # 1. 왜도, 첨도
-    table.append([
-        "Skew (왜도)",
-        f"{results['skew']:.3f}",
-        "-",
-        "-"
-    ])
-    table.append([
-        "Excess Kurtosis (첨도)",
-        f"{results['kurt_excess']:.3f}",
-        "-",
-        "-"
-    ])
+# 3. 검정결과 시각화
+if X1_res['pvals_matrix'] is not None:
+    stat_test.p_heatmap(
+        X1_res['pvals_matrix'],
+        alpha=alpha,
+        clip_upper=0.05,
+        annot_mode="p",
+        cmap="rocket_r",
+        figsize=(8, 6),
+        text_color="black",
+    )
+    plt.show()
 
-    # 2. D'Agostino K²
-    table.append([
-        "D’Agostino K²",
-        f"{results['dagostino_k2']:.3f}",
-        f"p={results['dagostino_p']:.3f}",
-        "Reject" if results['dagostino_p'] < alpha else "Fail"
-    ])
+# 4. room type으로 이상치 시각화
+outlier.boxplot(df, X1, y, factor=1.5, figsize=(8,6), tablefmt='github', verbose=True)
 
-    # 3. Jarque–Bera
-    table.append([
-        "Jarque–Bera",
-        f"{results['jarque_bera']:.3f}",
-        f"p={results['jarque_bera_p']:.3f}",
-        "Reject" if results['jarque_bera_p'] < alpha else "Fail"
-    ])
+# -> 적어도 한 개 이상의 room type 쌍의 price 분포가 통계적으로 다르다.
+# -> 따라서 room type 을 사용하여 price 이상치를 판단할 수는 있지만,
+# -> 박스플롯 확인 결과 room type 은 price 이상치를 완전하게 설명하지 못한다.
 
-    # 4. Lilliefors KS
-    table.append([
-        "Lilliefors KS",
-        f"{results['lilliefors_stat']:.3f}",
-        f"p={results['lilliefors_p']:.3f}",
-        "Reject" if results['lilliefors_p'] < alpha else "Fail"
-    ])
+# ------------------------------
+# 이상치를 정의할 기준 컬럼 찾기
+# 2) room_structure_type price의 연관성
+# ------------------------------
+X2 = 'room_structure_type'
+y = 'log_price'
+alpha = 0.05
+max_shapiro_n = 5000
 
-    # 5. Anderson–Darling (여러 유의수준)
-    for sl, cv in results['anderson_crit'].items():
-        decision = "Reject" if results['anderson_stat'] > cv else "Fail"
-        table.append([
-            f"Anderson–Darling @{sl}%",
-            f"{results['anderson_stat']:.3f}",
-            f"crit={cv:.3f}",
-            decision
-        ])
+print('\n=== room structure type 과 price 연관성 가설 검정 ===')
+# 1. 정규성과 등분산성 검정 후, Kruskal-Wallis 검정 진행
+X2_stat_test = stat_test.decide(df, X2, y, alpha=alpha, verbose=True);
 
-    # 6. 실무적 판정
-    table.append([
-        "Practical Normal",
-        "-",
-        "-",
-        str(results['practical_normal'])
-    ])
+# 2. Kruskal-Wallis 검정 진행, 사후 검정은 Dunn(holm 보정)
+X2_res = stat_test.kruskal_dunn(df, X2, y, alpha=alpha, adjust='holm', verbose=True);
 
-    headers = ["검정항목", "통계량", "p-값 / 임계값", "판정"]
-    print(tabulate(table, headers=headers, tablefmt="github"))
+# 3. 검정결과 시각화
+if X2_res['pvals_matrix'] is not None:
+    stat_test.p_heatmap(
+        X2_res['pvals_matrix'],
+        alpha=alpha,
+        clip_upper=0.05,
+        annot_mode="none",
+        cmap="rocket_r",
+        figsize=(8, 6),
+        text_color="black",
+    )
+    plt.show()
 
+# 4. room structure type 으로 이상치 시각화
+outlier.boxplot(df, X2, y, factor=1.5, figsize=(8,6), tablefmt='github', verbose=True);
+
+# -> 적어도 한 개 이상의 room structure type 쌍의 price 분포가 통계적으로 다르다.
+# -> 따라서 room structure type 을 사용하여 price 이상치를 판단할 수는 있지만,
+# -> 박스플롯 확인 결과 room structure type 은 price 이상치를 완전하게 설명하지 못한다.
+
+# ------------------------------------------------------------------------------------------
+# 이상치를 정의할 기준 컬럼 찾기
+# 3) room_structure_type 그룹 간 p-value 검사 결과를 바탕으로 새로운 카테고리 제안 (p-value 거리로 군집화)
+# ------------------------------------------------------------------------------------------
+pmat = X2_res['pvals_matrix']          # Dunn 사후 p-value DataFrame
+index = pmat.index
+
+# 1. p 값을 [ε, 1] 범위로 고정
+P = np.clip(pmat.values, 1e-10, 1.0)
+
+# 2. 거리 = -log10(p),  p=1 → 0
+D = -np.log10(P)
+np.fill_diagonal(D, 0)
+
+# 3. linkage (average·k=5 예시)
+Z      = sch.linkage(squareform(D), method='average')
+labels = sch.fcluster(Z, t=5, criterion='maxclust')
+
+# 4. 매핑
+struct_grp_map = dict(zip(index, labels))
+df['room_new_type'] = df['room_structure_type'].map(struct_grp_map)
+
+print("\n=== 군집화로 도출한 새로운 그룹 카테고리 ===")
+for k in sorted(set(labels)):
+    print(f"Group {k}: {[s for s,l in struct_grp_map.items() if l==k]}")
+
+# 5. 군집별 표본 수 & 로그 가격 통계
+grp_stat = (
+    df.groupby('room_new_type')['price']
+      .agg(n='size', median='median', q1=lambda s: s.quantile(.25), q3=lambda s: s.quantile(.75))
+      .sort_values('median')
+)
+
+# 6. 중앙값과 2사분위, 3사분위를 고려하여 재배치
+# - 5번그룹(townhouse)은 금액 특성상 4번그룹에 통합 가능
+# - barn, kezhan, ranch, dome은 개수가 부족해 군집화가 불가능 -> 적합한 가격군에 배치
+df.loc[df.room_structure_type == 'townhouse', 'room_new_type'] = 3
+df.loc[df.room_structure_type == 'barn', 'room_new_type'] = 1
+df.loc[df.room_structure_type == 'kezhan', 'room_new_type'] = 4
+df.loc[df.room_structure_type == 'ranch', 'room_new_type'] = 4
+df.loc[df.room_structure_type == 'dome', 'room_new_type'] = 4
+
+# 7. 그룹명 변경
+# - 금액대 유사한 그룹끼리 배치했기에, high, upper mid, mid, low mid로 변경
+df['room_new_type'] = df['room_new_type'].astype(int)
+
+group_name_map = {4: "Low-Mid", 3: "Mid", 1: "Upper-Mid",  2: "High"}
+df['room_new_type'] = df['room_new_type'].map(group_name_map)
+
+# 8. room new type 과 price 연관성 - kruskal wallis 검정
+new_res = stat_test.kruskal_dunn(df, X='room_new_type', y='price', alpha=alpha, adjust='holm', verbose=True);
+
+#9. 박스플롯
+bounds = outlier.robust_bounds(df, 'room_new_type', 'price', k=3)
+
+df = df.merge(bounds, on='room_new_type', how='left')
+df['is_outlier'] = (df['price'] < df['lower']) | (df['price'] > df['upper'])
+
+plot_df = df.copy()
+
+# Separate clean data and outliers
+clean_df = plot_df[~plot_df['is_outlier']]
+out_df   = plot_df[plot_df['is_outlier']]
+
+fig, ax = plt.subplots(figsize=(10, 6))
+
+# Box‑and‑whisker for each structure_group (clean data only)
+groups = sorted(clean_df['room_new_type'].unique())
+data   = [clean_df.loc[clean_df['room_new_type'] == g, 'price'] for g in groups]
+
+ax.boxplot(data, labels=groups, showfliers=True)  # hide internal fliers
+
+ax.set_xlabel("room_new_type")
+ax.set_ylabel("Price ($)")
+ax.set_title("Price distribution by room_new_type Group (outliers removed)")
+
+plt.tight_layout()
+plt.show()
+
+# -> kruskal 검정 결과, 유의하지 않은 그룹쌍은 없었다.
+# -> 이후, 박스플롯으로 이상치를 확인해보면 해당 그룹은 이상치를 잘 설명하고 있음을 알 수 있다.
+
+stats_type = df.groupby("room_new_type")['price'].apply(outlier.stats)
+print("=== room_new_type 별 price 이상치 ===")
+
+# 인덱스를 컬럼으로 올리기
+stats_type = stats_type.reset_index()
+
+# apply 결과를 MultiIndex → DataFrame 으로 펼치기
+stats_type = (
+    df.groupby("room_new_type")['price']
+      .apply(outlier.stats)
+      .unstack()              # outlier_count, outlier_ratio 가 각각 컬럼이 됨
+      .reset_index()          # 구조를 DataFrame으로 완성
+)
+type_outlier_count = stats_type['outlier_count'].sum()
+type_outlier_ratio = stats_type['outlier_count'].sum() / 22308
+
+print(f"전체 이상치 개수: {type_outlier_count}")
+print(f"전체 이상치 비율: {type_outlier_ratio:.4f}")
+
+df.groupby('room_new_type')['price'].describe()
+stats_clean = (
+    df.groupby('room_new_type')['price']
+      .apply(outlier.describe_without)   # → 다중 인덱스 Series
+      .unstack()                    # → 행: structure_group, 열: describe 항목
+)
+
+mask = df.groupby('room_new_type')['price'] \
+         .transform(lambda s: outlier.is_not(s, factor=1.5))
+
+# 2) 이상치가 아닌 행만 골라 새로운 DataFrame에 저장
+outlier_removed_df = df[mask].copy()
+
+# 3) 확인 (원본 vs 제거 후 행 개수)
+print(f"Original rows: {len(df)}, Without outliers: {len(outlier_removed_df)}")
+
+# 4) 필요하다면 인덱스 리셋
+outlier_removed_df.reset_index(drop=True, inplace=True)
+
+outlier_removed_df.to_csv('/Users/hyeom/Documents/GitHub/advanced_project/Airbnb_project_15/outlier_removed.csv')

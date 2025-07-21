@@ -202,14 +202,14 @@ def extract_structure(pt):
     return pt_l
 
 rt_cats = set(df['room_type'].str.strip().str.lower())
-df['structure_type'] = df['property_type'].apply(lambda x: (
+df['room_structure_type'] = df['property_type'].apply(lambda x: (
     x.strip().lower() if x.strip().lower() not in rt_cats
     else pd.NA
 ))
 
-mask = df['structure_type'].notna()
-df.loc[mask, 'structure_type'] = df.loc[mask, 'structure_type'].apply(extract_structure)
-df['structure_type'] = df['structure_type'].fillna('rental unit')
+mask = df['room_structure_type'].notna()
+df.loc[mask, 'room_structure_type'] = df.loc[mask, 'room_structure_type'].apply(extract_structure)
+df['room_structure_type'] = df['room_structure_type'].fillna('rental unit')
 
 '''residential = {
     'rental unit','home','condo','townhouse','cottage',
