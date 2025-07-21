@@ -42,7 +42,7 @@ import networkx as nx
 # ------------------------------
 # 전처리를 완료한 csv 파일 불러오기
 # ------------------------------
-df = pd.read_csv('/Users/hyeom/Documents/GitHub/advanced_project/jiwon_project/csv_files/preprocessing_filtered.csv', index_col=0)
+df = pd.read_csv('/jiwon_project/csv_files/preprocessing_filtered.csv', index_col=0)
 '''
 
 # ------------------------------
