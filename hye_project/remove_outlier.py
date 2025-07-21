@@ -42,7 +42,8 @@ import networkx as nx
 # ------------------------------
 # 전처리를 완료한 csv 파일 불러오기
 # ------------------------------
-df = pd.read_csv('/Users/hyeom/Documents/GitHub/advanced_project/jiwon_project/csv_files/preprocessing_filtered.csv')
+df = pd.read_csv('/Users/hyeom/Documents/GitHub/advanced_project/jiwon_project/csv_files/preprocessing_filtered.csv', index_col=0)
+'''
 
 # ------------------------------
 # price 컬럼 정규성 및 분포 확인하기
@@ -58,9 +59,11 @@ plt.xlabel("Theoretical Quantiles")
 plt.ylabel("Sample Quantiles")
 plt.tight_layout()
 plt.show()
+'''
 
 # 2. price가 이상치로 인해 정규성을 따르지 않기 때문에, log_price 컬럼 추가
 df['log_price'] = np.log1p(df['price'])
+'''
 
 print('=== log price 정규성 검정 ===')
 log_price_normality = normality.test(df['log_price']);
@@ -114,7 +117,7 @@ outlier.boxplot(df, X1, y, factor=1.5, figsize=(8,6), tablefmt='github', verbose
 # -> 적어도 한 개 이상의 room type 쌍의 price 분포가 통계적으로 다르다.
 # -> 따라서 room type 을 사용하여 price 이상치를 판단할 수는 있지만,
 # -> 박스플롯 확인 결과 room type 은 price 이상치를 완전하게 설명하지 못한다.
-
+'''
 # ------------------------------
 # 이상치를 정의할 기준 컬럼 찾기
 # 2) room_structure_type price의 연관성
@@ -269,6 +272,19 @@ outlier_removed_df = df[mask].copy()
 print(f"Original rows: {len(df)}, Without outliers: {len(outlier_removed_df)}")
 
 # 4) 필요하다면 인덱스 리셋
-outlier_removed_df.reset_index(drop=True, inplace=True)
+if 'Unnamed: 0' in df.columns:
+    df = df.drop(columns=['Unnamed: 0'])
 
-outlier_removed_df.to_csv('/Users/hyeom/Documents/GitHub/advanced_project/Airbnb_project_15/outlier_removed.csv')
+df = df.drop(columns=['median', 'lower', 'upper', 'n', 'is_outlier'])
+df['room_new_type'] = df['room_new_type'].str.lower()
+
+# 3) 인덱스를 0,1,2… 로 재설정하고 파일에 저장
+df = df.reset_index(drop=True)
+df.index.name = ''
+df.to_csv(
+    '/Users/hyeom/Documents/GitHub/advanced_project/Airbnb_project_15/outlier_removed.csv',
+    index=False,
+    header=True,
+    encoding='utf-8'
+)
+print("Saved without 'Unnamed: 0' and without index.")
