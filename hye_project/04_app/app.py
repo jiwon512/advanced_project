@@ -69,6 +69,9 @@ if mode == "예비 호스트":
             step=1.0,
             help="희망 1박 요금은 10달러 ~ 900달러 사이에서 입력해 주세요."
         )
+        if target_price < 10 or target_price > 900:
+            st.error("⚠️ 입력값은 10~900달러 사이여야 합니다.")
+            st.stop()
     else:
         desired_monthly = st.number_input(
             "원하는 월수입 ($)",
