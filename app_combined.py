@@ -6,7 +6,7 @@ import re
 
 # ====== 1. 경로/피처리스트/데이터 로드 ======
 # 가격 예측 모델
-PRICE_MODEL_PATH = "/Users/Jiwon/Documents/GitHub/advanced_project/hye_project/03_MachineLearning/for_app.pkl"
+PRICE_MODEL_PATH = "/Users/Jiwon/Documents/GitHub/advanced_project/jiwon_price.pkl"
 PRICE_DF_PATH = "/Users/Jiwon/Documents/GitHub/advanced_project/jiwon_project/4.app/backup/processed_hye.csv"
 
 # occupancy 예측 모델
