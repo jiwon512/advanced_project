@@ -5,6 +5,7 @@ import pandas as pd
 # ──────────────────────────────────────────────────────────────────────────────
 
 index_cols = ['id','host_id']
+y_cols = ['price', 'log_price']
 
 # - 혜영 컬럼 --------------------------------------------------------------------
 cat_cols = [
@@ -25,7 +26,9 @@ bin_cols = [
     'neighborhood_overview_exists'
 ]
 other_flags = ['grp01_high','grp04_high']
+
 features = cat_cols + num_cols + bin_cols + other_flags
+all_cols = index_cols + y_cols + features
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 1) Mapping Dictionary
@@ -93,12 +96,9 @@ type_map = {
 # ──────────────────────────────────────────────────────────────────────────────
 # 2) 전처리 함수
 # ──────────────────────────────────────────────────────────────────────────────
-# ──────────────────────────────────────────────────────────────────────────────
-# 2) 전처리 함수
-# ──────────────────────────────────────────────────────────────────────────────
 def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     # 1) 필요한 컬럼만 복사
-    df_out = df[index_cols + features].copy()
+    df_out = df[all_cols].copy()
 
     # 2) UI용 매핑 컬럼 생성
     #   a) cluster_label: 코드 → 쉼표로 연결된 동네 목록
@@ -134,6 +134,58 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
 
     return df_out
 
+
+def rename_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    비슷한 의미의 컬럼들을 일관된 스네이크 케이스 네이밍으로 통합합니다.
+    """
+    rename_map = {
+        # 클러스터
+        'neigh_cluster_reduced':        'nei_cluster_code',
+        'cluster_label':                'nei_cluster_label',  # UI용 매핑 컬럼
+        # 클러스터-가격 플래그
+        'grp01_high':                   'nei_cluster_grp01_high',
+        'grp04_high':                   'nei_cluster_grp04_high',
+        # 자치구·동네
+        'neighbourhood_group_cleansed': 'nei_borough',
+        'neighbourhood_cleansed':       'nei_neighbourhood',
+        # 룸 타입
+        'room_type_ord':                'room_type_code',
+        'room_type_label':              'room_type_label',       # UI용 매핑 컬럼
+        # 구조 그룹
+        'room_structure_type':          'room_structure',
+        'room_new_type_ord':            'room_group_code',
+        'room_group_label':             'room_group_label',      # UI용 매핑 컬럼
+        ''
+        # 설명란 존재 여부
+        'description_length_group':     'info_des_len',
+        'name_length_group':            'info_name_len',
+        'neighborhood_overview_exists': 'info_overview_is',
+        # 호스트 응답
+        'host_response_time_score':     'resp_time_score',
+        'host_response_rate_score':     'resp_rate_score',
+        # 이진 플래그 (has_~)
+        'instant_bookable':             'info_instant_bookable',
+        'is_long_term':                 'info_long_term_allowed',
+        'host_is_superhost':            'host_is_superhost',
+        # 어매니티
+        'has_Air_conditioning':         'amen_has_air_conditioning',
+        'has_Wifi':                     'amen_has_wifi',
+        'has_Bathtub':                  'amen_has_bathtub',
+        'has_Carbon_monoxide_alarm':    'amen_has_carbon_alarm',
+        'has_Elevator':                 'amen_has_elevator',
+        'amenities_cnt':                'amen_count',
+        'amen_grp':                     'amenity_group',
+        # 리뷰 수치형
+        'review_scores_rating':         'review_score',
+        'region_score_norm':            'region_score_norm',
+        'number_of_reviews':            'review_num_total',
+        'number_of_reviews_ltm':        'review_num_30d',
+        'accommodates':                 'facility_accommodates',
+        'bath_score_mul':               'facility_bath_score'
+    }
+    return df.rename(columns=rename_map)
+
 # ──────────────────────────────────────────────────────────────────────────────
 # 3) 스크립트 실행부
 # ──────────────────────────────────────────────────────────────────────────────
@@ -142,6 +194,9 @@ if __name__ == "__main__":
     df_raw = pd.read_csv("/Users/hyeom/Documents/GitHub/advanced_project/hye_project/for_machine_learning_2.csv")
     # 추가 전처리
     df_final = preprocess(df_raw)
+    df_final = rename_columns(df_final)
     # 최종 저장
     df_final.to_csv("/Users/hyeom/Documents/GitHub/advanced_project/hye_project/04_app/preprocessed_hye.csv", index=False)
     print("✅ processed_final.csv 생성 완료")
+
+    
