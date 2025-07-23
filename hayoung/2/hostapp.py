@@ -1,9 +1,3 @@
-기존에 short_or_mid나 short_or_avg로 묶었던 길이 그룹을 단순히 **'short'**으로 통일해달라는 말씀이시죠? 네, 그렇게 수정하여 코드를 다시 제공해 드릴게요.
-
-Streamlit 앱 코드 (수정됨: 길이 그룹 'short'으로 통일)
-아래 코드에서 get_name_length_group, get_description_length_group, get_host_about_length_group 함수가 변경되었습니다. 이제 각 길이 그룹 함수의 반환 값 중 'short_or_mid'와 'short_or_avg'는 모두 **'short'**으로 변경됩니다.
-
-Python
 
 import streamlit as st
 import pandas as pd
