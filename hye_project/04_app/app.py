@@ -16,13 +16,15 @@ def load_pipeline(path):
 
 DF_PATH      = "/Users/hyeom/Documents/GitHub/advanced_project/hye_project/for_machine_learning_2.csv"
 MODEL_PATH   = "/Users/hyeom/Documents/GitHub/advanced_project/hye_project/03_MachineLearning/for_app.pkl"
+
 df           = load_df(DF_PATH)
 pipeline     = load_pipeline(MODEL_PATH)
+
 
 # ── util : 예측 & Δ 계산 ─────────────────────────────────────────
 def predict_price(row: dict) -> float:
     """row(dict) → USD 예측값 (열 순서 고정!)"""
-    X = pd.DataFrame([row])[features]   # ★ 열 재정렬 핵심 ★
+    X = pd.DataFrame([row])[hye_features]   # ★ 열 재정렬 핵심 ★
     return float(np.expm1(pipeline.predict(X)[0]))
 
 
@@ -43,8 +45,9 @@ bin_cols = ['instant_bookable','is_long_term','host_is_superhost',
             'has_Carbon_monoxide_alarm','has_Elevator',
             'neighborhood_overview_exists']
 other_flags = ['grp01_high','grp04_high']
+
 # 0) 학습 때 쓰던 정확한 순서
-features = cat_cols + num_cols + bin_cols + other_flags   # ← 전역에 추가
+hye_features = cat_cols + num_cols + bin_cols + other_flags   # ← 전역에 추가
 
 defaults = {
     **df[num_cols].median().to_dict(),
@@ -363,6 +366,13 @@ if mode == "기존 호스트":
     inv_room = {s:g for g, lst in room_map.items() for s in lst}
     profile['room_new_type_ord'] = inv_room.get(struct,0)
 
+    with st.expander("숙소 설명란은 어떻게 선택하나요? 📋", expanded=False):
+        st.image(
+            "/Users/hyeom/Documents/GitHub/advanced_project/hye_project/structure_example.png",
+            use_container_width=True
+        )
+        st.write("숙소 설명란의 해당 정보를 바탕으로 작성해 주세요! 임의로 선택시 예측율이 떨어질 수 있어요.")
+
     # 숙박 인원
     acc = st.number_input("최대 숙박 인원", 1, max_acc,
                           int(defaults['accommodates']), 1,
@@ -408,6 +418,9 @@ if mode == "기존 호스트":
     target_adr = desired_rev/booked_days
     st.metric("현재 ADR", f"${curr_adr:,.0f}")
     st.metric("목표 ADR", f"${target_adr:,.0f}", f"${target_adr-curr_adr:,.0f}")
+
+    with st.expander("💡 팁: ADR(1박 평균요금)이란?"):
+        st.write("ADR = (한 달 총수익) ÷ (한 달 예약된 날 수)로, 수익 목표를 달성하려면, 이 ADR 값을 방 가격 설정의 기준으로 활용하세요.")
 
     # ───────────────────────────────────────────────
     # 5-3) 비교 모드 & 버튼
