@@ -1,0 +1,134 @@
+=== Out[3] ===
+      id neighbourhood_cleansed neighbourhood_group_cleansed   latitude  \
+0  36121       Prospect Heights                     Brooklyn  40.673760   
+1  36647            East Harlem                    Manhattan  40.792454   
+2  38833                 Harlem                    Manhattan  40.818058   
+
+   longitude  price  estimated_occupancy_l365d  estimated_revenue_l365d  \
+0 -73.966110  200.0                          0                      0.0   
+1 -73.940742   82.0                          0                      0.0   
+2 -73.946671  139.0                        255                  35445.0   
+
+   availability_60  availability_365  ...  amen_grp  amen_grp_te  \
+0               57               362  ...      high     4.878113   
+1                0               204  ...      high     4.878113   
+2               18                25  ...      high     4.878113   
+
+   amen_grp_ord room_new_type_ord  neigh_cluster_reduced has_high_amen  \
+0             5                 1             nbr_grp_04             1   
+1             5                 2             nbr_grp_03             1   
+2             5                 0             nbr_grp_05             1   
+
+  room_type_ord  price_bc  grp01_high  grp04_high  
+0             0  5.632476           0           1  
+1             0  4.636282           0           0  
+2             2  5.223496           0           0  
+
+[3 rows x 90 columns]
+
+=== Out[6] ===
+      neighbourhood_cleansed neighbourhood_group_cleansed   latitude  \
+id                                                                     
+36121       Prospect Heights                     Brooklyn  40.673760   
+36647            East Harlem                    Manhattan  40.792454   
+38833                 Harlem                    Manhattan  40.818058   
+
+       longitude  price  estimated_occupancy_l365d  estimated_revenue_l365d  \
+id                                                                            
+36121 -73.966110  200.0                          0                      0.0   
+36647 -73.940742   82.0                          0                      0.0   
+38833 -73.946671  139.0                        255                  35445.0   
+
+       availability_60  availability_365  instant_bookable  ...  amen_grp  \
+id                                                          ...             
+36121               57               362                 0  ...      high   
+36647                0               204                 0  ...      high   
+38833               18                25                 0  ...      high   
+
+       amen_grp_te amen_grp_ord  room_new_type_ord neigh_cluster_reduced  \
+id                                                                         
+36121     4.878113            5                  1            nbr_grp_04   
+36647     4.878113            5                  2            nbr_grp_03   
+38833     4.878113            5                  0            nbr_grp_05   
+
+      has_high_amen  room_type_ord  price_bc  grp01_high  grp04_high  
+id                                                                    
+36121             1              0  5.632476           0           1  
+36647             1              0  4.636282           0           0  
+38833             1              2  5.223496           0           0  
+
+[3 rows x 89 columns]
+
+=== Out[16] ===
+Index(['neighbourhood_cleansed', 'neighbourhood_group_cleansed', 'latitude',
+       'longitude', 'price', 'estimated_occupancy_l365d',
+       'estimated_revenue_l365d', 'availability_60', 'availability_365',
+       'instant_bookable', 'is_long_term', 'is_activate', 'amenities',
+       'amenities_cnt', 'room_type', 'room_structure_type', 'accommodates',
+       'bath_score_mul', 'beds', 'number_of_reviews', 'number_of_reviews_ltm',
+       'number_of_reviews_l30d', 'review_scores_rating',
+       'review_scores_accuracy', 'review_scores_cleanliness',
+       'review_scores_checkin', 'review_scores_communication',
+       'review_scores_location', 'review_scores_value', 'host_id',
+       'name_length_group', 'description_length_group',
+       'neighborhood_overview_exists', 'host_about_length_group',
+       'host_is_superhost', 'host_has_profile_pic', 'host_identity_verified',
+       'host_response_time_score', 'host_response_rate_score',
+       'host_acceptance_rate_score', 'host_location_ny',
+       'host_location_boolean', 'log_price', 'room_new_type', 'neigh_cluster',
+       'neigh_k6', 'neigh_k', 'amen_list', 'has_Carbon_monoxide_alarm',
+       'has_Essentials', 'has_Hangers', 'has_Smoke_alarm', 'has_Wifi',
+       'has_Air_conditioning', 'has_Building_staff', 'has_Elevator', 'has_Gym',
+       'has_Heating', 'has_Paid_parking_off_premises', 'has_Shampoo',
+       'has_Bathtub', 'has_Cleaning_products', 'has_Cooking_basics',
+       'has_Dishes_and_silverware', 'has_Freezer', 'has_Kitchen', 'has_Oven',
+       'has_Dining_table', 'has_Exterior_security_cameras_on_property',
+       'has_Free_street_parking', 'has_Laundromat_nearby',
+       'has_Lock_on_bedroom_door', 'has_Microwave', 'common_cnt', 'high_cnt',
+       'upper_mid_cnt', 'mid_cnt', 'low_mid_cnt', 'has_any_high_amen',
+       'amen_grp', 'amen_grp_te', 'amen_grp_ord', 'room_new_type_ord',
+       'neigh_cluster_reduced', 'has_high_amen', 'room_type_ord', 'price_bc',
+       'grp01_high', 'grp04_high'],
+      dtype='object')
+
+=== Out[65] ===
+['catboost_final_3.cbm']
+
+=== Out[134] ===
+# 8) optional 5-fold CV RMSE(log)
+cv_scores = cross_val_score(
+    stack, X, y,
+    cv=5,
+    scoring='neg_root_mean_squared_error',
+    n_jobs=-1
+)
+print(f"CV RMSE (log): {-cv_scores.mean():.3f} ± {cv_scores.std():.3f}")
+
+=== Out[150] ===
+Index(['neighbourhood_cleansed', 'neighbourhood_group_cleansed', 'latitude',
+       'longitude', 'price', 'estimated_occupancy_l365d',
+       'estimated_revenue_l365d', 'availability_60', 'availability_365',
+       'instant_bookable',
+       ...
+       'grp04_high_x_amenities_cnt', 'room_type_ord_x_grp01_high',
+       'room_type_ord_x_accommodates', 'transport_count',
+       'infrastructure_count', 'tourism_count', 'poi_pca1', 'region_score',
+       'region_score_norm', 'region_cluster'],
+      dtype='object', length=103)
+
+=== Out[155] ===
+Index(['neighbourhood_cleansed', 'neighbourhood_group_cleansed', 'latitude',
+       'longitude', 'price', 'estimated_occupancy_l365d',
+       'estimated_revenue_l365d', 'availability_60', 'availability_365',
+       'instant_bookable',
+       ...
+       'grp04_high_x_amenities_cnt', 'room_type_ord_x_grp01_high',
+       'room_type_ord_x_accommodates', 'transport_count',
+       'infrastructure_count', 'tourism_count', 'poi_pca1', 'region_score',
+       'region_score_norm', 'region_cluster'],
+      dtype='object', length=103)
+
+=== Out[166] ===
+joblib.dump(stack, 'final_ensemble_model_2.pkl')
+print("Model saved to final_ensemble_model_2.pkl")
+
