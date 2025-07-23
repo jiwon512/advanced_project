@@ -10,7 +10,7 @@ PRICE_MODEL_PATH = "/Users/Jiwon/Documents/GitHub/advanced_project/jiwon_price.p
 PRICE_DF_PATH = "/Users/Jiwon/Documents/GitHub/advanced_project/jiwon_project/4.app/backup/processed_hye.csv"
 
 # occupancy 예측 모델
-OCC_MODEL_PATH = "/Users/Jiwon/Documents/GitHub/advanced_project/jiwon_project/occupancy_voting_model.pkl"
+OCC_MODEL_PATH = "/Users/Jiwon/Documents/GitHub/advanced_project/occupancy_voting_model.pkl"
 OCC_DF_PATH = "/Users/Jiwon/Documents/GitHub/advanced_project/jiwon_project/presentation/jiwon_entire.csv"
 
 # 가격 예측 피처리스트 (backup_app.py의 hye_features)

@@ -1,0 +1,17 @@
+name: airbnb_env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - scikit-learn=1.1.3
+  - numpy=1.23.5
+  - pandas=2.3.1
+  - joblib
+  - streamlit=1.26.0
+  - catboost
+  - pyarrow
+  - pydeck
+  - altair
+  - pip
+
