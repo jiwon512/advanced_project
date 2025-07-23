@@ -322,7 +322,7 @@ print(importances.sort_values(ascending=False).round(3))
 
 
 
-
+# 슈퍼호스트여부 판별 예측 모델링 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, roc_auc_score
@@ -551,14 +551,14 @@ for var in location_vars:
     plt.show()
 
 
-# 슈퍼호스트 예측 모델링 로지스틱/랜덤포레스트 앙상블 인사이트용
+# 슈퍼호스트 여부 예측 모델링 로지스틱/랜덤포레스트 앙상블 인사이트용
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 from sklearn.metrics import classification_report, roc_auc_score
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
-# 1. 변수 리스트 정의 (신뢰 변수는 별도 처리)
+# 1. 변수 리스트 정의 (신뢰 변수는 별도 처리) VIF가 높은 host변수들 trust_cols로 그룹지어 사용 
 strategy_cols = [
     'amenities_cnt', 'availability_365', 'price',
     'instant_bookable', 'host_about_length_group', 'room_type',
@@ -634,6 +634,87 @@ print(coeff_df.round(3).tail(15))
 
 # 예측 돌리기 (랜덤포레스트)
 
+# 1. host_response_time → 점수 변환 함수
+def response_time_to_score(response_time_str):
+    mapping = {
+        'within an hour': 4,
+        'within a few hours': 3,
+        'within a day': 2,
+        'a few days or more': 1
+    }
+    return mapping.get(response_time_str.lower(), 0)  # 기본 0점
+
+# 2. host_response_rate(0~100) → 점수 변환 함수
+def response_rate_to_score(rate_percent):
+    rate = rate_percent / 100
+    if rate <= 0.25:
+        return 1
+    elif rate <= 0.5:
+        return 2
+    elif rate <= 0.75:
+        return 3
+    else:
+        return 4
+
+# 3. host_acceptance_rate(0~100) → 점수 변환 함수
+def acceptance_rate_to_score(rate_percent):
+    rate = rate_percent / 100
+    if rate <= 0.25:
+        return 1
+    elif rate <= 0.5:
+        return 2
+    elif rate <= 0.75:
+        return 3
+    else:
+        return 4
+
+# 4. amenities 점수 계산 함수
+common_amenities = ['Carbon monoxide alarm', 'Essentials', 'Hangers', 'Smoke alarm', 'Wifi']
+
+type_amenity_dict = {
+    'high': ['Air conditioning', 'Building staff', 'Elevator', 'Gym', 'Heating', 'Paid parking off premises', 'Shampoo'],
+    'low-mid': ['Cleaning products', 'Dining table', 'Exterior security cameras on property', 'Free street parking', 
+                'Freezer', 'Laundromat nearby', 'Lock on bedroom door', 'Microwave'],
+    'mid': ['Cooking basics', 'Kitchen', 'Oven'],
+    'upper-mid': ['Bathtub', 'Cleaning products', 'Cooking basics', 'Dishes and silverware', 'Elevator', 'Freezer']
+}
+
+def calc_amenity_scores(amenities_list, room_new_type):
+    # 공통 amenity 점수
+    common_match = sum(1 for a in amenities_list if a in common_amenities) / len(common_amenities) if common_amenities else 0
+
+    # 타입별 amenity 점수
+    type_amenities = type_amenity_dict.get(room_new_type, [])
+    type_match = sum(1 for a in amenities_list if a in type_amenities) / len(type_amenities) if type_amenities else 0
+
+    return round(common_match, 3), round(type_match, 3)
+
+# 점수변환 예시 입력값
+# 사용자 입력 예시
+user_input = {
+    'host_response_time': 'within an hour',
+    'host_response_rate': 85,  # %
+    'host_acceptance_rate': 78,  # %
+    'amenities': ['Wifi', 'Essentials', 'Hangers', 'Oven', 'Kitchen'],
+    'room_new_type': 'mid'
+}
+
+# 점수 계산
+response_time_score = response_time_to_score(user_input['host_response_time'])
+response_rate_score = response_rate_to_score(user_input['host_response_rate'])
+acceptance_rate_score = acceptance_rate_to_score(user_input['host_acceptance_rate'])
+common_amenity_score, type_amenity_score = calc_amenity_scores(user_input['amenities'], user_input['room_new_type'])
+
+# 결과 출력
+print(f"host_response_time_score: {response_time_score}")
+print(f"host_response_rate_score: {response_rate_score}")
+print(f"host_acceptance_rate_score: {acceptance_rate_score}")
+print(f"common_amenity_score: {common_amenity_score}")
+print(f"type_amenity_score: {type_amenity_score}")
+
+
+
+# 점수계산 함수값 이용 
 # 새로운 데이터 예시 (입력값)
 new_data = pd.DataFrame([{
     'amenities_cnt': 12,
