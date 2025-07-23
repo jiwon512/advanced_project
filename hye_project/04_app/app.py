@@ -1,51 +1,60 @@
-# app.py  ─────────────────────────────────────────────────────────
 import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
 import re, ast
 
+from mapping import (
+
+    get_column_groups,
+    row_new_to_old,
+    model_features_old,
+    cluster_map,
+    borough_map,
+    type_map,
+    room_group_map as room_map,
+    amen_group_map as amen_map,
+    amen_selection_map
+)
+
 # ═════════════════════ 1) 데이터, 모델 로드 ══════════════════════
 @st.cache_data
-def load_df(path):
-    return pd.read_csv(path)
+def load_df(path, usecols=None):
+    return pd.read_csv(path, usecols=usecols)
 
 @st.cache_resource
 def load_pipeline(path):
     return joblib.load(path)
 
-DF_PATH      = "/Users/hyeom/Documents/GitHub/advanced_project/hye_project/for_machine_learning_2.csv"
-MODEL_PATH   = "/Users/hyeom/Documents/GitHub/advanced_project/hye_project/03_MachineLearning/for_app.pkl"
-df           = load_df(DF_PATH)
-pipeline     = load_pipeline(MODEL_PATH)
+# ── hye data load  ─────────────────────────────────────────
+hye_df_path     = "/hye_project/04_app/backup/processed_hye.csv"
+hye_model_path  = "/Users/hyeom/Documents/GitHub/advanced_project/hye_project/04_app/price_prediction_pipeline.pkl"
+
+hye_cols = get_column_groups()
+model_features_new = hye_cols['model_features_new']
+cat_cols       = hye_cols['cat_cols']
+num_cols       = hye_cols['num_cols']
+bin_cols       = hye_cols['bin_cols']
+other_flags    = hye_cols['other_flags']
+
+df = load_df(hye_df_path, usecols=get_column_groups()['ui_features'])
+hye_pipeline  = load_pipeline(hye_model_path)
+old_row = row_new_to_old(new_row_dict)
+X = pd.DataFrame([old_row])[model_features_old]
+
+
 
 # ── util : 예측 & Δ 계산 ─────────────────────────────────────────
 def predict_price(row: dict) -> float:
     """row(dict) → USD 예측값 (열 순서 고정!)"""
-    X = pd.DataFrame([row])[features]   # ★ 열 재정렬 핵심 ★
-    return float(np.expm1(pipeline.predict(X)[0]))
-
+    X = pd.DataFrame([row])[model_features]   # ★ 열 재정렬 핵심 ★
+    return float(np.expm1(hye_pipeline.predict(X)[0]))
 
 def add_strategy(bucket: list, label: str, test_row: dict, base: float):
     delta = predict_price(test_row) - base
     bucket.append((label, delta))
 
-
-# ═════════════════════ 2) 기본 setting / 매핑 ════════════════════
-cat_cols = ['neigh_cluster_reduced','neighbourhood_group_cleansed',
-            'room_type_ord','room_new_type_ord','room_structure_type',
-            'amen_grp','description_length_group','name_length_group']
-num_cols = ['latitude','longitude','accommodates','bath_score_mul','amenities_cnt',
-            'review_scores_rating','number_of_reviews','number_of_reviews_ltm',
-            'region_score_norm','host_response_time_score','host_response_rate_score']
-bin_cols = ['instant_bookable','is_long_term','host_is_superhost',
-            'has_Air_conditioning','has_Wifi','has_Bathtub',
-            'has_Carbon_monoxide_alarm','has_Elevator',
-            'neighborhood_overview_exists']
-other_flags = ['grp01_high','grp04_high']
-# 0) 학습 때 쓰던 정확한 순서
-features = cat_cols + num_cols + bin_cols + other_flags   # ← 전역에 추가
-
+# ═════════════════════ 2) 기본 setting / defaults ════════════════════
 defaults = {
     **df[num_cols].median().to_dict(),
     **df[cat_cols].mode().iloc[0].to_dict(),
@@ -53,178 +62,10 @@ defaults = {
     **{f:0 for f in other_flags}
 }
 
-# 매핑: 신규 룸 타입 -> 구조 리스트
-room_map = {
-    1: ['rental unit', 'guest suite', 'place', 'townhouse', 'serviced apartment', 'guesthouse'], #mid
-    2: ['condo', 'loft', 'houseboat', 'boutique hotel', 'boat', 'villa', 'tiny home', 'bungalow', #upper-mid
-                  'cottage', 'aparthotel', 'barn'],
-    0: ['home', 'bed and breakfast', 'casa particular', 'vacation home', 'earthen home', 'camper/rv', #low-mid
-                'hostel', 'kezhan', 'ranch', 'religious building', 'dome'],
-    3: ['hotel', 'resort', 'tower'] # high
-}
-# 매핑: 클러스터 코드 -> 동네 목록
-cluster_map = {
-    'nbr_grp_04': ['Prospect Heights', 'Williamsburg', "Hell's Kitchen", 'Fort Greene', 'Clinton Hill',
-                   'Chelsea', 'Gowanus', 'Lower East Side', 'East Village', 'Park Slope', 'Upper East Side',
-                   'Middle Village', 'South Slope', 'Upper West Side', 'Chinatown', 'Windsor Terrace',
-                   'Prospect-Lefferts Gardens', 'Downtown Brooklyn', 'Long Island City', 'Spuyten Duyvil',
-                   'Gramercy', 'Lighthouse Hill', 'Springfield Gardens', 'Little Italy', 'New Brighton',
-                   'Howland Hook', 'Roosevelt Island', 'Pelham Bay', 'East Morrisania', 'Mill Basin',
-                   'Bergen Beach', "Prince's Bay", 'Navy Yard', 'Gerritsen Beach', 'Breezy Point',
-                   'University Heights', 'West Farms', 'Oakwood', 'Dongan Hills', 'Grymes Hill'],
-    'nbr_grp_03': ['East Harlem', 'Bedford-Stuyvesant', 'Crown Heights', 'Mott Haven', 'Morningside Heights',
-                   'Rockaway Beach', 'Eastchester', 'Sheepshead Bay', 'East New York', 'Two Bridges',
-                   'City Island', 'Port Morris', 'Arverne', 'Queens Village', 'Canarsie', 'Bay Terrace',
-                   'Forest Hills', 'Unionport', 'Jamaica', 'Bayside', 'South Ozone Park', 'Howard Beach',
-                   'Fresh Meadows', 'Bellerose', 'Edgemere', 'Stuyvesant Town', 'Rosedale', 'Kew Gardens Hills',
-                   'Laurelton', 'Tremont', 'Olinville', 'College Point', 'Westchester Square',
-                   'North Riverdale', 'Douglaston', 'Far Rockaway', 'Cambria Heights', 'Jamaica Hills',
-                   'Woodlawn', 'Castle Hill', 'Van Nest', 'Country Club', 'Riverdale'],
-    'nbr_grp_05': ['Harlem', 'Washington Heights', 'Ditmars Steinway', 'Astoria', 'Ridgewood', 'Clason Point',
-                   'Kingsbridge', 'Bushwick', 'Sunnyside', 'Kensington', 'Briarwood', 'Allerton', 'Flushing',
-                   'East Elmhurst', 'Norwood', 'Concourse', 'Richmond Hill', 'Maspeth', 'Soundview',
-                   'Rego Park', 'Woodhaven', 'Mount Hope', 'Concourse Village', 'Midwood', 'Ozone Park',
-                   'Cypress Hills', 'Manhattan Beach', 'Brownsville', 'Holliswood', 'Baychester', 'Wakefield',
-                   'St. Albans', 'Whitestone', 'Mount Eden', 'Glendale', 'Morrisania', 'Marble Hill', 'Hollis',
-                   'Williamsbridge', 'Melrose', 'Throgs Neck', 'Parkchester', 'Schuylerville', 'Belmont',
-                   'Morris Heights', 'Little Neck'],
-    'nbr_grp_01': ['Carroll Gardens', 'Midtown', 'Greenpoint', 'West Village', 'Brooklyn Heights', 'Kips Bay',
-                   'Nolita', 'Greenwich Village', 'Tribeca', 'Boerum Hill', 'SoHo', 'Red Hook', 'Murray Hill',
-                   'DUMBO', 'Cobble Hill', 'Financial District', 'Theater District', 'Battery Park City',
-                   'Civic Center', 'Vinegar Hill', 'NoHo', 'Columbia St', 'Flatiron District', 'Neponsit',
-                   'Willowbrook', 'Belle Harbor'],
-    'other': ['Flatbush', 'Bensonhurst', 'Gravesend', 'Shore Acres', 'Sunset Park', 'Co-op City', 'Woodside',
-              'Inwood', 'Tompkinsville', 'Tottenville', 'Concord', 'Jackson Heights', 'East Flatbush',
-              'Longwood', 'Flatlands', 'Huguenot', 'St. George', 'Bay Ridge', 'Elmhurst', 'Randall Manor',
-              'Borough Park', 'Clifton', 'West Brighton', 'Jamaica Estates', 'Kew Gardens', 'Hunts Point',
-              'Fort Hamilton', 'Great Kills', 'Bronxdale', 'Corona', 'Castleton Corners', 'Brighton Beach',
-              'Claremont Village', 'Highbridge', 'South Beach', 'Pelham Gardens', 'Dyker Heights', 'Arrochar',
-              'Morris Park', 'Fordham', 'Coney Island', 'Edenwald', 'Bath Beach', 'Stapleton',
-              'Mariners Harbor', 'Port Richmond', 'Midland Beach', 'New Dorp Beach', 'Rosebank',
-              'Arden Heights', 'Grant City', 'New Springville', 'Emerson Hill', "Bull's Head", 'Silver Lake',
-              'Fieldston', 'Bayswater', 'Sea Gate', 'Westerleigh', 'Graniteville', 'Chelsea, Staten Island',
-              'Eltingville', 'Woodrow', 'Rossville', 'Todt Hill']
-}
-
 # 역매핑: 동네 -> 클러스터 코드
 inv_cluster_map = {neigh: grp for grp, lst in cluster_map.items() for neigh in lst}
 
-borough_map = {
-    "Manhattan": [
-        # from nbr_grp_04
-        "Hell's Kitchen", "Chelsea", "Lower East Side", "East Village",
-        "Upper East Side", "Upper West Side", "Chinatown", "Gramercy",
-        "Little Italy", "Roosevelt Island",
-        # from nbr_grp_03
-        "Two Bridges", "East Harlem",
-        # from nbr_grp_05
-        "Harlem", "Washington Heights", "Maspeth",  # Maspeth 경계상 퀸즈와 접하지만 ManhattanCB5에 일부 포함
-        "Morningside Heights",
-        # from nbr_grp_01
-        "Midtown", "West Village", "Kips Bay", "Nolita",
-        "Greenwich Village", "Tribeca", "SoHo", "Murray Hill",
-        "Financial District", "Theater District", "Battery Park City",
-        "Civic Center", "NoHo", "Flatiron District"
-    ],
-    "Brooklyn": [
-        # nbr_grp_04
-        "Prospect Heights", "Williamsburg", "Fort Greene", "Clinton Hill",
-        "Gowanus", "Park Slope", "South Slope", "Windsor Terrace",
-        "Prospect-Lefferts Gardens", "Downtown Brooklyn",
-        "Mill Basin", "Bergen Beach", "Navy Yard", "Gerritsen Beach",
-        # nbr_grp_03
-        "Bedford-Stuyvesant", "Crown Heights", "Bushwick", "Sheepshead Bay",
-        "East New York", "Cypress Hills",
-        # nbr_grp_05
-        "Bushwick",  # 중복 제거 전후
-        # nbr_grp_01
-        "Carroll Gardens", "Brooklyn Heights", "Boerum Hill",
-        "Red Hook", "DUMBO", "Cobble Hill", "Vinegar Hill", "Columbia St"
-    ],
-    "Queens": [
-        # nbr_grp_04
-        "Middle Village", "Long Island City", "Springfield Gardens",
-        # nbr_grp_05
-        "Astoria", "Ridgewood", "Sunnyside", "Ditmars Steinway",
-        "Forest Hills", "Flushing", "Rego Park", "Briarwood",
-        "Fresh Meadows", "Holliswood", "Jamaica", "Richmond Hill",
-        "Soundview", "Bay Terrace", "College Point", "Little Neck",
-        "Ozone Park", "Woodhaven", "St. Albans", "Kew Gardens Hills",
-        "Cambria Heights", "Laurelton", "Rosedale", "Arverne",
-        "Bayside", "Edgemere", "Far Rockaway", "Neponsit", "Rockaway Park",
-        "Bayswater", "Belle Harbor"  # Queens CB14
-    ],
-    "Bronx": [
-        # nbr_grp_04
-        "Spuyten Duyvil", "Pelham Bay", "East Morrisania", "University Heights",
-        "West Farms",
-        # nbr_grp_03
-        "Mott Haven", "Eastchester", "Port Morris", "City Island",
-        "Bedford-Stuyvesant"  # 경계상 일부 Bronx CB1 포함
-        # nbr_grp_05
-        "Clason Point", "Kingsbridge", "Allerton", "Norwood",
-        "Concourse", "Soundview", "Mount Hope", "Concourse Village",
-        "Baychester", "Wakefield", "Mount Eden", "Morrisania",
-        "Marble Hill", "Melrose", "Throgs Neck", "Parkchester",
-        "Schuylerville", "Belmont", "Morris Heights"
-    ],
-    "Staten Island": [
-        # nbr_grp_04
-        "Lighthouse Hill", "New Brighton", "Prince's Bay", "Oakwood",
-        "Dongan Hills", "Grymes Hill",
-        # nbr_grp_01
-        "Willowbrook",
-        # other
-        "Arrochar", "Annadale", "Arden Heights", "Bay Terrace",
-        "Bloomfield", "Bulls Head", "Castleton Corners", "Clifton",
-        "Concord", "Eltingville", "Emerson Hill", "Fort Wadsworth",
-        "Grant City", "Grasmere", "Great Kills", "Huguenot",
-        "Mariners Harbor", "Meiers Corners", "Midland Beach",
-        "New Dorp Beach", "New Springville", "Oakwood", "Ocean Breeze",
-        "Old Town", "Port Richmond", "Randall Manor", "Rosebank",
-        "Seaview", "Shore Acres", "South Beach", "Stapleton",
-        "St. George", "Todt Hill", "Tottenville", "West Brighton",
-        "Westerleigh", "Woodrow"
-    ]
-}
-# 매핑: 어매니티 구분
-amenity_map={
- 'common':['Carbon monoxide alarm','Essentials','Hangers','Smoke alarm','Wifi'],
- 'high':['Air conditioning','Building staff','Elevator','Gym','Heating','Paid parking off premises','Shampoo'],
- 'low-mid':['Cleaning products','Dining table','Exterior security cameras on property','Free street parking','Freezer','Laundromat nearby','Lock on bedroom door','Microwave'],
- 'mid':['Cooking basics','Kitchen','Oven'],
- 'upper-mid':['Bathtub','Cleaning products','Cooking basics','Dishes and silverware','Elevator','Freezer']
-}
-
-# 매핑: 룸 타입 ordinal -> 문자열
-type_map = {
-    0: 'Private room',
-    1: 'Shared room',
-    2: 'Entire home/apt',
-    3: 'Hotel room'
-}
-
-REP_AMENITIES = [
-    # Safety
-    "Smoke alarm", "Carbon-monoxide alarm", "Fire extinguisher",
-    "First-aid kit", "Exterior cameras",
-    # Living
-    "Wifi", "Air conditioning", "Heating / Hot water",
-    "Essentials", "Bed linens & towels", "Hair-dryer / Iron",
-    "Washer", "Dryer", "Dedicated workspace", "Pets allowed",
-    # Kitchen
-    "Kitchen", "Cooking basics", "Refrigerator", "Microwave",
-    "Oven", "Stove", "Dishwasher", "Coffee maker",
-    # Entertainment
-    "TV", "Streaming services", "Sound system / Bluetooth speaker",
-    "Board & video games",
-    # Outdoor / Facilities
-    "Backyard", "Patio / Balcony", "Outdoor furniture", "BBQ grill",
-    "Pool", "Bathtub", "Gym", "Free parking", "Paid parking",
-    "EV charger", "Elevator"
-]
-
-VAL_RMSE_USD = 48.36            # 검증 RMSE
+VAL_RMSE_USD = 48.36
 MIN_NIGHTLY  = 10.0
 MAX_NIGHTLY  = 900.0
 max_acc      = int(df['accommodates'].max())
@@ -363,6 +204,13 @@ if mode == "기존 호스트":
     inv_room = {s:g for g, lst in room_map.items() for s in lst}
     profile['room_new_type_ord'] = inv_room.get(struct,0)
 
+    with st.expander("숙소 설명란은 어떻게 선택하나요? 📋", expanded=False):
+        st.image(
+            "/Users/hyeom/Documents/GitHub/advanced_project/hye_project/structure_example.png",
+            use_container_width=True
+        )
+        st.write("숙소 설명란의 해당 정보를 바탕으로 작성해 주세요! 임의로 선택시 예측율이 떨어질 수 있어요.")
+
     # 숙박 인원
     acc = st.number_input("최대 숙박 인원", 1, max_acc,
                           int(defaults['accommodates']), 1,
@@ -381,9 +229,9 @@ if mode == "기존 호스트":
     def clean(s:str)->str: return re.sub(r'[\uD800-\uDFFF]', '', s).lower().strip()
     grp_label = {0:'low-mid',1:'mid',2:'upper-mid',3:'high'}.get(
                     profile['room_new_type_ord'],'common')
-    default_opts = [a for a in REP_AMENITIES
-                    if clean(a) in [clean(x) for x in amenity_map[grp_label]]]
-    sel_am = st.multiselect("주요 Amenity", REP_AMENITIES, default_opts,
+    default_opts = [a for a in amen_selection_map
+                    if clean(a) in [clean(x) for x in amen_map[grp_label]]]
+    sel_am = st.multiselect("주요 Amenity", amen_selection_map, default_opts,
                             key=f"{key_prefix}amen")
     profile['amenities_cnt'] = len(sel_am)
     profile['amen_grp']      = grp_label
@@ -408,6 +256,9 @@ if mode == "기존 호스트":
     target_adr = desired_rev/booked_days
     st.metric("현재 ADR", f"${curr_adr:,.0f}")
     st.metric("목표 ADR", f"${target_adr:,.0f}", f"${target_adr-curr_adr:,.0f}")
+
+    with st.expander("💡 팁: ADR(1박 평균요금)이란?"):
+        st.write("ADR = (한 달 총수익) ÷ (한 달 예약된 날 수)로, 수익 목표를 달성하려면, 이 ADR 값을 방 가격 설정의 기준으로 활용하세요.")
 
     # ───────────────────────────────────────────────
     # 5-3) 비교 모드 & 버튼
