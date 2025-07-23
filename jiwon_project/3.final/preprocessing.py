@@ -1,232 +1,211 @@
-CSV_PATH = "/Users/Jiwon/Documents/GitHub/advanced_project/jiwon_project/csv_files/NY_Airbnb_original_df.csv"
-print(f"▶ preprocessing.py 실행 시작, CSV_PATH={CSV_PATH}")
-
+# preprocessing.py
+import os
+import ast, re
 
 import numpy as np
 import pandas as pd
-import ast, re
-
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.pipeline import Pipeline
-# ColumnTransformer 는 여전히 compose 에 있음
-from sklearn.compose import ColumnTransformer  
-# SimpleImputer 은 impute 아래로 이동
-from sklearn.impute import SimpleImputer  
+from scipy.spatial.distance import squareform
+from sklearn.base      import BaseEstimator, TransformerMixin
+from sklearn.compose   import ColumnTransformer
+from sklearn.decomposition import PCA
+from sklearn.impute    import SimpleImputer
+from sklearn.pipeline  import Pipeline
 from sklearn.preprocessing import (
     FunctionTransformer,
-    StandardScaler,
     OneHotEncoder,
+    StandardScaler,
 )
-from sklearn.decomposition import PCA
+from sklearn.cluster   import KMeans
+import joblib
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 설정: 파일 경로
+# ─────────────────────────────────────────────────────────────────────────────
+CSV_PATH     = "/Users/Jiwon/Documents/GitHub/advanced_project/jiwon_project/csv_files/NY_Airbnb_original_df.csv"
+OUTPUT_DIR   = "models"
+PREP_PATH    = os.path.join(OUTPUT_DIR, "preprocessor.joblib")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 0) 원본 읽기
+# ─────────────────────────────────────────────────────────────────────────────
+print(f"▶ preprocessing.py 시작: {CSV_PATH}")
+df = pd.read_csv(CSV_PATH)
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 1) room_new_type 군집화 (원본 df 에 컬럼 추가)
+# ─────────────────────────────────────────────────────────────────────────────
+# (예시: OSMnx API 호출 부분 생략하고 'room_structure_type' 자체에 기반)
+# --- 1-1) 원래 있던 room_structure_type 전처리 가정
+df['room_structure_type'] = df['room_structure_type'].fillna('others').str.lower().str.strip()
+# --- 1-2) 그룹별 log(price) 통계 집계
+grp = df.groupby('room_structure_type')['price'].median().reset_index()
+# --- 1-3) KMeans 로 4개 군집
+from sklearn.preprocessing import FunctionTransformer
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler as SS
+Xg = SS().fit_transform(np.log1p(grp[['price']]))
+km = KMeans(n_clusters=4, random_state=42).fit(Xg)
+grp['cluster'] = km.labels_
+# --- 1-4) 라벨 이름 매핑
+name_map = {i:f"group_{i}" for i in grp['cluster'].unique()}
+df = df.merge(grp[['room_structure_type','cluster']], on='room_structure_type', how='left')
+df['room_new_type'] = df['cluster'].map(name_map)
+df.drop(columns=['cluster'], inplace=True)
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 2) 이상치 제거 (IQR*1.5)
+# ─────────────────────────────────────────────────────────────────────────────
+def iqr_bounds(s, factor=1.5):
+    q1, q3 = np.percentile(s.dropna(), [25,75])
+    iqr = q3 - q1
+    return q1 - factor*iqr, q3 + factor*iqr
 
-# ----------------------------
-# 1) 개별 커스텀 Transformer
-# ----------------------------
+# price 기준으로 room_new_type별 outlier 마스크
+masks = []
+for grp_name, sub in df.groupby('room_new_type'):
+    lo, hi = iqr_bounds(np.log1p(sub['price']), factor=1.5)
+    masks.append(sub.index[(np.log1p(sub['price']) >= lo) & (np.log1p(sub['price']) <= hi)])
+good_idx = pd.Index(np.concatenate(masks))
+df = df.loc[good_idx].reset_index(drop=True)
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 3) custom Transformer 정의
+# ─────────────────────────────────────────────────────────────────────────────
 class AmenitiesCounter(BaseEstimator, TransformerMixin):
-    """리스트 형태 amenities → 길이 하나의 컬럼으로."""
     def fit(self, X, y=None): return self
     def transform(self, X):
-        # X: array-like of strings or lists
         return np.array([
-            len(ast.literal_eval(x)) if isinstance(x, str) else len(x or [])
+            len(ast.literal_eval(x)) if isinstance(x,str) else len(x or [])
             for x in X.ravel()
         ])[:,None]
 
 class VerificationsCounter(BaseEstimator, TransformerMixin):
-    """host_verifications 컬럼(문자열 리스트) → 길이."""
     def fit(self, X, y=None): return self
     def transform(self, X):
-        cnts = []
+        out=[]
         for x in X.ravel():
-            if isinstance(x, list):      cnts.append(len(x))
+            if isinstance(x,list): out.append(len(x))
             else:
-                try:       cnts.append(len(ast.literal_eval(x)))
-                except:   cnts.append(0)
-        return np.array(cnts)[:,None]
-
-class StructureCategoryMapper(BaseEstimator, TransformerMixin):
-    """property_type/room_type → structure_category."""
-    def __init__(self):
-        self.residential = {
-            'rental unit','home','condo','townhouse','cottage',
-            'bungalow','villa','vacation home','earthen home',
-            'ranch','casa particular','tiny home','entire home/apt'
-        }
-        self.apartment_suite = {
-            'guest suite','loft','serviced apartment','aparthotel',
-            'private room'
-        }
-        self.hotel_lodging = {
-            'hotel','boutique hotel','bed and breakfast',
-            'resort','hostel','guesthouse','hotel room'
-        }
-    def fit(self, X, y=None): return self
-    def transform(self, X):
-        out = []
-        for pt, rt in X:
-            pt_l = pt.strip().lower()
-            rt_l = rt.strip().lower()
-            if rt_l in self.residential or pt_l in self.residential:
-                out.append('Residential')
-            elif rt_l in self.apartment_suite or pt_l in self.apartment_suite:
-                out.append('Apartment_Suite')
-            elif rt_l in self.hotel_lodging or pt_l in self.hotel_lodging:
-                out.append('Hotel_Lodging')
-            else:
-                out.append('Others')
+                try: out.append(len(ast.literal_eval(x)))
+                except: out.append(0)
         return np.array(out)[:,None]
 
-
-def parse_baths(text):
-    if pd.isna(text): return np.nan
-    s = str(text).lower()
-    m = re.search(r'(\d+(\.\d+)?)', s)
+def parse_bath(txt):
+    if pd.isna(txt): return np.nan
+    m=re.search(r"(\d+(\.\d+)?)", str(txt).lower())
     if m: return float(m.group(1))
-    if 'half' in s: return 0.5
-    return np.nan
+    return 0.5 if 'half' in str(txt).lower() else np.nan
 
-class BathroomProcessor(BaseEstimator, TransformerMixin):
-    """bathrooms, bathrooms_text → bath_score_mul."""
-    def __init__(self, w_private=1.0, w_shared=0.5):
-        self.wp, self.ws = w_private, w_shared
-    def fit(self, X, y=None): return self
+class BathScore(BaseEstimator, TransformerMixin):
+    def fit(self,X,y=None): return self
     def transform(self, X):
-        # X is array of shape (n,2): [bathrooms, bathrooms_text]
-        baths, texts = X[:,0].astype(float), X[:,1]
-        parsed = np.array([parse_baths(t) for t in texts])
-        # where parsed notna replace baths
-        mask = ~np.isnan(parsed)
-        baths[mask] = parsed[mask]
-        # treat zeros
-        baths = np.where(baths==0, 1, baths)
-        is_shared = np.char.find(texts.astype(str).astype(object), 'shared')>=0
-        mul = np.where(~is_shared, self.wp, self.ws)
-        bath_score = baths * mul
-        bath_score = np.where(bath_score==0, 1, bath_score)
-        return bath_score[:,None]
+        baths = X[:,0].astype(float)
+        txts  = X[:,1]
+        parsed = np.array([parse_bath(t) for t in txts])
+        mask   = ~np.isnan(parsed)
+        baths[mask]=parsed[mask]
+        baths = np.where(baths==0,1,baths)
+        shared = np.char.find(txts.astype(str),'shared')>=0
+        mult   = np.where(shared,0.5,1.0)
+        score  = baths*mult
+        return np.where(score==0,1,score)[:,None]
 
-
-# ----------------------------
-# 2) 컬럼 분류
-# ----------------------------
-numeric_features = [
-    'price', 'amenities_cnt', 'minimum_nights', 'availability_365',
-    'host_response_time_score','host_response_rate_score','host_acceptance_rate_score',
-    'bath_score_mul',
-    'number_of_reviews','number_of_reviews_ltm',
-    'number_of_reviews_l30d','number_of_reviews_ly','reviews_per_month',
-    'transport_count','infrastructure_count','tourism_count'
+# ─────────────────────────────────────────────────────────────────────────────
+# 4) 파이프라인용 컬럼 분류
+# ─────────────────────────────────────────────────────────────────────────────
+num_feats = [
+  'price','amenities_cnt','minimum_nights','availability_365',
+  'host_response_time_score','host_response_rate_score','host_acceptance_rate_score',
+  'bath_score_mul',
+  'number_of_reviews','number_of_reviews_ltm','number_of_reviews_l30d','number_of_reviews_ly','reviews_per_month',
+  'transport_count','infrastructure_count','tourism_count'
 ]
-# 파생된 PCA 칼럼(나중에)
-# poi_pca, host_response_pca, score_info_pca, review_info_pca
-# → 여기서는 생략하고 pipeline 끝단에 추가할 수도 있음
-
-categorical_features = [
-    'instant_bookable','is_long_term','neighborhood_overview_exists',
-    'name_length_group','description_length_group','host_about_length_group',
-    'host_identity_verified','host_has_profile_pic','host_is_superhost',
-    'host_location_boolean','host_location_ny',
-    'is_private','is_activate'
+cat_feats = [
+  'instant_bookable','is_long_term','neighborhood_overview_exists',
+  'name_length_group','description_length_group','host_about_length_group',
+  'host_identity_verified','host_has_profile_pic','host_is_superhost',
+  'host_location_boolean','host_location_ny',
+  'is_private','is_activate','room_new_type'
 ]
+amen_feats  = ['amenities']
+verif_feats = ['host_verifications']
+bath_feats  = ['bathrooms','bathrooms_text']
 
-# 멀티입력 컬럼 처리
-amenities_feature        = ['amenities']
-verifications_feature    = ['host_verifications']
-structure_cat_input      = ['property_type','room_type']
-bathroom_input           = ['bathrooms','bathrooms_text']
-
-# ----------------------------
-# 3) 파이프라인 정의
-# ----------------------------
-# 3‑1) 수치형 pipeline
-num_pipeline = Pipeline([
-    ('impute',  SimpleImputer(strategy='median')),
-    ('scale',   StandardScaler()),
+# ─────────────────────────────────────────────────────────────────────────────
+# 5) ColumnTransformer & Pipeline 정의
+# ─────────────────────────────────────────────────────────────────────────────
+num_pipe = Pipeline([
+    ('imp',  SimpleImputer(strategy='median')),
+    ('sc',   StandardScaler()),
+])
+cat_pipe = Pipeline([
+    ('imp',  SimpleImputer(strategy='most_frequent')),
+    ('ohe',  OneHotEncoder(handle_unknown='ignore')),          # sparse=False 는 최신버전 기본
+    ('arr',  FunctionTransformer(lambda X: X.toarray(), validate=False)),
+])
+amen_pipe = Pipeline([
+    ('cnt', AmenitiesCounter()),
+    ('sc',  StandardScaler()),
+])
+verif_pipe = Pipeline([
+    ('cnt', VerificationsCounter()),
+    ('sc',  StandardScaler()),
+])
+bath_pipe = Pipeline([
+    ('proc', BathScore()),
+    ('sc',   StandardScaler()),
 ])
 
-# 3‑2) 범주형 pipeline
-cat_pipeline = Pipeline([
-    ('impute',  SimpleImputer(strategy='most_frequent')),
-    ('ohe',     OneHotEncoder(handle_unknown='ignore')),
-    ('toarr',  FunctionTransformer(lambda X: X.toarray(), validate=False))
-])
-
-# 3‑3) amenities pipeline
-amen_pipeline = Pipeline([
-    ('cnt',     AmenitiesCounter()),
-    ('scale',   StandardScaler()),
-])
-
-# 3‑4) verifications pipeline
-verif_pipeline = Pipeline([
-    ('cnt',     VerificationsCounter()),
-    ('scale',   StandardScaler()),
-])
-
-# 3‑5) structure_category pipeline
-struct_pipeline = Pipeline([
-    ('map',     StructureCategoryMapper()),
-    ('ohe',     OneHotEncoder(handle_unknown='ignore')),
-    ('toarr',  FunctionTransformer(lambda X: X.toarray(), validate=False)),
-])
-
-# 3‑6) bathroom pipeline
-bath_pipeline = Pipeline([
-    ('proc',    BathroomProcessor()),
-    ('scale',   StandardScaler()),
-])
-
-# 3‑7) ColumnTransformer 에 묶기
-preprocessor = ColumnTransformer(transformers=[
-    ('num',     num_pipeline,       numeric_features),
-    ('cat',     cat_pipeline,       categorical_features),
-    ('amen',    amen_pipeline,      amenities_feature),
-    ('verif',   verif_pipeline,     verifications_feature),
-    ('struct',  struct_pipeline,    structure_cat_input),
-    ('bath',    bath_pipeline,      bathroom_input),
+base_pre   = ColumnTransformer([
+    ('num',    num_pipe,    num_feats),
+    ('cat',    cat_pipe,    cat_feats),
+    ('amen',   amen_pipe,   amen_feats),
+    ('verif',  verif_pipe,  verif_feats),
+    ('bath',   bath_pipe,   bath_feats),
 ], remainder='drop')
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 6) 추가 PCA pipeline (poi, host_res, score, review)
+# ─────────────────────────────────────────────────────────────────────────────
+def make_pca(cols):
+    return Pipeline([
+        ('sel', FunctionTransformer(lambda df: df[cols], validate=False)),
+        ('sc',  StandardScaler()),
+        ('pc',  PCA(n_components=1, random_state=42)),
+    ])
 
-# ----------------------------
-# 4) PCA 예시 (poi_pca 하나만)
-# ----------------------------
-poi_cols = ['transport_count','infrastructure_count','tourism_count']
-poi_pipeline = Pipeline([
-    ('select',    FunctionTransformer(lambda df: df[poi_cols], validate=False)),
-    ('scale',     StandardScaler()),
-    ('pca',       PCA(n_components=1, random_state=42)),
-])
+poi_cols   = ['transport_count','infrastructure_count','tourism_count']
+resp_cols  = ['host_response_time_score','host_response_rate_score','host_acceptance_rate_score']
+score_cols = ['review_scores_rating','review_scores_accuracy','review_scores_cleanliness',
+              'review_scores_checkin','review_scores_communication','review_scores_location','review_scores_value']
+rev_cols   = ['number_of_reviews','number_of_reviews_ltm','number_of_reviews_l30d','number_of_reviews_ly','reviews_per_month']
 
-# 전체 preprocessor + poi_pca 합치려면
-full_preprocessor = ColumnTransformer(transformers=[
-    ('base' , preprocessor,            numeric_features
-                                     + categorical_features
-                                     + amenities_feature
-                                     + verifications_feature
-                                     + structure_cat_input
-                                     + bathroom_input),
-    ('poi'  , poi_pipeline,           poi_cols),
-    # 호스트 응답/리뷰/점수 PCA도 동일하게 추가 가능
+pca_pre = ColumnTransformer([
+    ('poi',   make_pca(poi_cols),   poi_cols),
+    ('resp',  make_pca(resp_cols),  resp_cols),
+    ('score', make_pca(score_cols), score_cols),
+    ('rev',   make_pca(rev_cols),   rev_cols),
 ], remainder='drop')
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 7) 전체 합친 full_preprocessor
+# ─────────────────────────────────────────────────────────────────────────────
+full_preprocessor = ColumnTransformer([
+    ('base', base_pre,    num_feats + cat_feats + amen_feats + verif_feats + bath_feats),
+    ('pca',  pca_pre,      poi_cols + resp_cols + score_cols + rev_cols)
+], remainder='drop')
 
-# ----------------------------
-# 5) 사용 예시
-# ----------------------------
-if __name__=='__main__':
-    df = pd.read_csv('/Users/Jiwon/Documents/GitHub/advanced_project/jiwon_project/csv_files/NY_Airbnb_original_df.csv')
-
+# ─────────────────────────────────────────────────────────────────────────────
+# 8) fit & dump
+# ─────────────────────────────────────────────────────────────────────────────
+if __name__=="__main__":
+    print(" · fitting preprocessor…")
+    # X, y 분리
     X = df.drop(columns=['estimated_occupancy_l365d'])
     y = df['estimated_occupancy_l365d']
-
-    # fit_transform
-    Xp = full_preprocessor.fit_transform(X)
-    print("Transformed shape:", Xp.shape)
+    # fit
+    full_preprocessor.fit(X, y)
     # 저장
-    import joblib
-    joblib.dump(full_preprocessor, "models/preprocessor.joblib")
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    joblib.dump(full_preprocessor, PREP_PATH)
+    print(f" · 저장 완료: {PREP_PATH}")
