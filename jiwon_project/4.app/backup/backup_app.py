@@ -15,8 +15,8 @@ occ_cols = [
 ]
 
 # occupancy 예측 모델/데이터 경로
-OCC_MODEL_PATH = "jiwon_project/presentation/occupancy_voting_model.pkl"
-OCC_DF_PATH = "jiwon_project/presentation/jiwon_entire.csv"
+OCC_MODEL_PATH = "/Users/Jiwon/Documents/GitHub/advanced_project/jiwon_project/4.app/backup/backup_app.py"
+OCC_DF_PATH = "/Users/Jiwon/Documents/GitHub/advanced_project/jiwon_project/presentation/jiwon_entire.csv"
 
 # occupancy 예측 데이터/모델 로드
 @st.cache_data
