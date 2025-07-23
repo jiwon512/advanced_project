@@ -1,6 +1,5 @@
 import pandas as pd
 import pingouin as pg
-import lightgbm as lgb
 import numpy as np
 import shap
 from sklearn.preprocessing import OneHotEncoder
@@ -14,6 +13,9 @@ import scipy.stats as stats
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import platform
+
+plt.rcParams['font.family'] = 'Malgun Gothic'  
+plt.rcParams['axes.unicode_minus'] = False  
 
 csv_path = 'outlier_removed.csv'    # 여기에 absolute path
 # CSV 읽기
@@ -319,74 +321,57 @@ print("\n=== 변수 중요도 ===")
 print(importances.sort_values(ascending=False).round(3))
 
 
-# 변수중요도 기준으로 전략가능한 변수들 전략모델링 랜덤포레스트 
-strategy_cols = ['amenities_cnt','availability_365','log_price','price','host_response_time_score','host_acceptance_rate_score',
-                 'instant_bookable','host_about_length_group','room_type','neighbourhood_group_cleansed','host_has_profile_pic',
-                 'neighborhood_overview_exists','name_length_group','description_length_group','is_long_term','accommodates','host_identity_verified',
-                 'room_new_type','common_amenity_score', 'type_amenity_score']
-# 중요 변수만 선택해서 전략 모델용 데이터셋 구성
-X_top = df[strategy_cols]
-X_top_encoded = pd.get_dummies(X_top)
-# 학습/테스트 분할
-X_train_top, X_test_top, y_train_top, y_test_top = train_test_split(
-    X_top_encoded, y, test_size=0.2, random_state=42, stratify=y)
 
-# 랜덤포레스트로 학습 (전략 모델)
-rf_top = RandomForestClassifier(n_estimators=300, random_state=42)
-rf_top.fit(X_train_top, y_train_top)
-# 평가 지표
-y_pred_top = rf_top.predict(X_test_top)
-y_proba_top = rf_top.predict_proba(X_test_top)[:, 1]
-
-print("\n=== 전략 모델 성능 평가  ===")
-print(classification_report(y_test_top, y_pred_top))
-print("AUC:", roc_auc_score(y_test_top, y_proba_top))
-
-
-# 변수 중요도
-importances2 = pd.Series(rf_top.feature_importances_, index=X_top_encoded.columns)
-print("\n=== 변수 중요도 ===")
-importances2.sort_values(ascending=False).round(2)
-
-
-# 위치 'transport_count', 'infrastructure_count', 'tourism_count', 'poi_pca1' 변수들 랜덤포레스트 
-Location = ['transport_count', 'infrastructure_count', 'tourism_count', 'poi_pca1']
-TARGET = 'host_is_superhost'
+# 슈퍼호스트여부 판별 예측 모델링 
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, roc_auc_score
 
-# X, y 분리
-X = df[Location]
-y = df[TARGET].astype(int)
+# 1. 목표 변수 설정
+TARGET = 'host_is_superhost'
 
+# === 변수 목록 정의 ===
+
+strategy_cols = ['amenities_cnt', 'availability_365', 'price', 'host_about_length_group', 'room_type','name_length_group', 'description_length_group',
+                 'host_has_profile_pic', 'host_response_time_score','type_amenity_score','common_amenity_score',
+                 'host_acceptance_rate_score', 'host_identity_verified','is_long_term', 'accommodates']
+
+# === 데이터셋 준비 ===
+X = df[strategy_cols]
+y = df['host_is_superhost'].astype(int)
+
+# 원핫 인코딩
+X_encoded = pd.get_dummies(X, drop_first=False)
+
+# 학습/테스트 분할
+X_train, X_test, y_train, y_test = train_test_split(
+    X_encoded, y, test_size=0.2, random_state=42, stratify=y)
+
+# === 랜덤포레스트 모델 정의 ===
 rf = RandomForestClassifier(
-    n_estimators=2000,  # 더 많은 트리
-    max_depth=30,      # 최대 깊이 제한
-    min_samples_split=15,  # 노드 분할 최소 샘플 수
-    min_samples_leaf=10,    # 리프 노드 최소 샘플 수
+    n_estimators=1000,
+    max_depth=30,
+    min_samples_split=15,
+    min_samples_leaf=10,
     random_state=42,
     class_weight='balanced')
-
-# 학습용/테스트용 데이터 나누기
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42, stratify=y)
 
 # 모델 학습
 rf.fit(X_train, y_train)
 
 # 예측
 y_pred = rf.predict(X_test)
-y_prob = rf.predict_proba(X_test)[:, 1]
+y_proba = rf.predict_proba(X_test)[:, 1]
 
-# 평가
-print("\n=== Random Forest ===")
+# === 평가 지표 출력 ===
+print("\n=== 랜덤포레스트 전략모델 성능 평가 ===")
 print(classification_report(y_test, y_pred))
-print("AUC:", round(roc_auc_score(y_test, y_prob), 4))
-# 변수 중요도
-importances_rf = pd.Series(rf.feature_importances_, index=Location)
-print("\n=== Random Forest 변수 중요도 ===")
-print(importances_rf.sort_values(ascending=False))
+print("AUC:", round(roc_auc_score(y_test, y_proba), 4))
 
-
+# === 변수 중요도 출력 ===
+importances = pd.Series(rf.feature_importances_, index=X_encoded.columns)
+print("\n=== 변수 중요도 ===")
+print(importances.sort_values(ascending=False).round(3))
 
 
 # 수치형데이터 중앙값 평균값 비교 
@@ -566,41 +551,64 @@ for var in location_vars:
     plt.show()
 
 
-# 슈퍼호스트 예측 모델링 로지스틱/랜덤포레스트 앙상블
+# 슈퍼호스트 여부 예측 모델링 로지스틱/랜덤포레스트 앙상블 인사이트용
+from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, VotingClassifier
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, roc_auc_score
-import pandas as pd
+from statsmodels.stats.outliers_influence import variance_inflation_factor
 
-# 전략 변수 리스트
+# 1. 변수 리스트 정의 (신뢰 변수는 별도 처리) VIF가 높은 host변수들 trust_cols로 그룹지어 사용 
 strategy_cols = [
-    'amenities_cnt','availability_365','price','host_response_time_score',
-    'host_acceptance_rate_score','instant_bookable','host_about_length_group','room_type',
-    'neighbourhood_group_cleansed','host_has_profile_pic','neighborhood_overview_exists',
-    'name_length_group','description_length_group','is_long_term','accommodates',
-    'host_identity_verified','room_new_type','common_amenity_score', 'type_amenity_score']
+    'amenities_cnt', 'availability_365', 'price',
+    'instant_bookable', 'host_about_length_group', 'room_type',
+    'neighbourhood_group_cleansed', 'name_length_group', 'description_length_group',
+    'is_long_term', 'accommodates'
+]
 
-# 설명 변수: 원핫 인코딩 포함
-X_top = df[strategy_cols]
-X_top_encoded = pd.get_dummies(X_top, drop_first=True)
+trust_cols = ['host_has_profile_pic', 'host_response_time_score', 'host_acceptance_rate_score', 'host_identity_verified']
 
-# 목표 변수
-y = df['host_is_superhost']
+# 2. 모델링용 데이터 복사
+df_model = df.copy()
 
-# 학습/테스트 분할
+# 3. 신뢰 변수들 결측치는 0으로 채우고 host_trust_score 생성 (평균)
+df_model[trust_cols] = df_model[trust_cols].fillna(0)
+df_model['host_trust_score'] = df_model[trust_cols].mean(axis=1)
+
+# 4. 모델링에 사용할 변수 리스트에 host_trust_score 추가
+model_cols = strategy_cols + ['host_trust_score']
+
+# 5. 설명 변수 준비 (원래 신뢰 변수는 제외)
+X_raw = df_model[model_cols].copy()
+
+# 6. 리스트형 변수 있으면 제거 (예외 처리)
+for col in X_raw.columns:
+    if X_raw[col].apply(lambda x: isinstance(x, list)).any():
+        print(f"[제거] 리스트형 컬럼: {col}")
+        X_raw.drop(columns=[col], inplace=True)
+
+# 7. 원핫 인코딩
+X_encoded = pd.get_dummies(X_raw, drop_first=True)
+
+# 8. 결측치 확인 및 제거 (NaN 0으로 대체)
+print("결측치 합계:\n", X_encoded.isnull().sum()[X_encoded.isnull().sum() > 0])
+X_encoded = X_encoded.fillna(0)
+
+# 9. 목표 변수 설정
+y = df_model['host_is_superhost']
+
+# 10. 학습/테스트 분리
 X_train, X_test, y_train, y_test = train_test_split(
-    X_top_encoded, y, test_size=0.2, random_state=42, stratify=y)
+    X_encoded, y, test_size=0.2, random_state=42, stratify=y)
 
-# 개별 모델 정의
-log_reg = LogisticRegression(max_iter=3000, random_state=42)
-rf = RandomForestClassifier(n_estimators=300, random_state=42)
+# 11. 모델 정의 및 학습
+log_reg = LogisticRegression(max_iter=5000, random_state=42, class_weight='balanced')
+rf = RandomForestClassifier(n_estimators=300, random_state=42, class_weight='balanced')
 
-# 소프트 보팅 앙상블
 ensemble = VotingClassifier(estimators=[('lr', log_reg), ('rf', rf)], voting='soft')
 ensemble.fit(X_train, y_train)
 
-# 예측 및 평가
+# 12. 예측 및 평가
 y_pred = ensemble.predict(X_test)
 y_proba = ensemble.predict_proba(X_test)[:, 1]
 
@@ -608,83 +616,146 @@ print("\n=== 소프트 보팅 앙상블 평가 결과 ===")
 print(classification_report(y_test, y_pred))
 print("AUC:", roc_auc_score(y_test, y_proba))
 
-# 로지스틱 회귀 계수 분석
+# 13. 로지스틱 회귀 계수 분석
 log_reg.fit(X_train, y_train)
 coeff_df = pd.DataFrame({
     'Feature': X_train.columns,
-    'Coefficient': log_reg.coef_[0]}).sort_values(by='Coefficient', ascending=False)
+    'Coefficient': log_reg.coef_[0]
+}).sort_values(by='Coefficient', ascending=False)
 
 print("\n=== 로지스틱 회귀 계수 상위 변수 ===")
 print(coeff_df.round(3).head(10))
 
 print("\n=== 로지스틱 회귀 계수 하위 변수 ===")
-print(coeff_df.round(3).tail(10))
+print(coeff_df.round(3).tail(15))
 
 
-def preprocess_input(new_data_df, train_columns):
-    """
-    신규 데이터 전처리 함수
-    - 원핫인코딩 적용
-    - 훈련 데이터 컬럼과 일치하도록 맞춤
-    """
-    # 원핫인코딩 (drop_first=True 적용한 훈련과 동일하게)
-    new_data_encoded = pd.get_dummies(new_data_df, drop_first=True)
-    
-    # 훈련 데이터 컬럼과 맞추기 (없는 컬럼은 0으로 채움)
-    missing_cols = set(train_columns) - set(new_data_encoded.columns)
-    for c in missing_cols:
-        new_data_encoded[c] = 0
-    
-    # 순서 맞추기
-    new_data_encoded = new_data_encoded[train_columns]
-    
-    return new_data_encoded
 
-def predict_superhost(new_data_df, model, train_columns):
-    """
-    신규 데이터 받아서 슈퍼호스트 여부 예측
-    """
-    # 전처리
-    X_new = preprocess_input(new_data_df, train_columns)
-    
-    # 예측 (확률)
-    proba = model.predict_proba(X_new)[:,1]
-    pred = model.predict(X_new)
-    
-    # 결과 반환
-    result = new_data_df.copy()
-    result['superhost_probability'] = proba
-    result['superhost_prediction'] = pred
-    
-    return result
 
-# 예측 돌리기 
-'''
-new_data_df = pd.DataFrame([{
-    'amenities_cnt': 
-    'availability_365': 
-    'price': 
-    'host_response_time_score': 
-    'host_acceptance_rate_score': 
-    'instant_bookable': 
-    'host_about_length_group':            # ['short', 'med', 'long']
-    'room_type':                          # ['Entire home/apt', 'Private room', 'Shared room', 'Hotel room']
-    'neighbourhood_group_cleansed':       # ['Brooklyn', 'Manhattan', 'Queens', 'Bronx', 'Staten Island']
-    'host_has_profile_pic': 
-    'neighborhood_overview_exists':
-    'name_length_group':                  # ['short', 'short_or_med', 'long']
-    'description_length_group':           # ['short_or_avg', 'long']
-    'is_long_term': 
-    'accommodates': 
-    'host_identity_verified': 
-    'room_new_type':                      # ['low', 'low-mid', 'mid', 'high']
-    'common_amenity_score': 
-    'type_amenity_score': 
+# 예측 돌리기 (랜덤포레스트)
+
+# 1. host_response_time → 점수 변환 함수
+def response_time_to_score(response_time_str):
+    mapping = {
+        'within an hour': 4,
+        'within a few hours': 3,
+        'within a day': 2,
+        'a few days or more': 1
+    }
+    return mapping.get(response_time_str.lower(), 0)  # 기본 0점
+
+# 2. host_response_rate(0~100) → 점수 변환 함수
+def response_rate_to_score(rate_percent):
+    rate = rate_percent / 100
+    if rate <= 0.25:
+        return 1
+    elif rate <= 0.5:
+        return 2
+    elif rate <= 0.75:
+        return 3
+    else:
+        return 4
+
+# 3. host_acceptance_rate(0~100) → 점수 변환 함수
+def acceptance_rate_to_score(rate_percent):
+    rate = rate_percent / 100
+    if rate <= 0.25:
+        return 1
+    elif rate <= 0.5:
+        return 2
+    elif rate <= 0.75:
+        return 3
+    else:
+        return 4
+
+# 4. amenities 점수 계산 함수
+common_amenities = ['Carbon monoxide alarm', 'Essentials', 'Hangers', 'Smoke alarm', 'Wifi']
+
+type_amenity_dict = {
+    'high': ['Air conditioning', 'Building staff', 'Elevator', 'Gym', 'Heating', 'Paid parking off premises', 'Shampoo'],
+    'low-mid': ['Cleaning products', 'Dining table', 'Exterior security cameras on property', 'Free street parking', 
+                'Freezer', 'Laundromat nearby', 'Lock on bedroom door', 'Microwave'],
+    'mid': ['Cooking basics', 'Kitchen', 'Oven'],
+    'upper-mid': ['Bathtub', 'Cleaning products', 'Cooking basics', 'Dishes and silverware', 'Elevator', 'Freezer']
+}
+
+def calc_amenity_scores(amenities_list, room_new_type):
+    # 공통 amenity 점수
+    common_match = sum(1 for a in amenities_list if a in common_amenities) / len(common_amenities) if common_amenities else 0
+
+    # 타입별 amenity 점수
+    type_amenities = type_amenity_dict.get(room_new_type, [])
+    type_match = sum(1 for a in amenities_list if a in type_amenities) / len(type_amenities) if type_amenities else 0
+
+    return round(common_match, 3), round(type_match, 3)
+
+# 점수변환 예시 입력값
+# 사용자 입력 예시
+user_input = {
+    'host_response_time': 'within an hour',
+    'host_response_rate': 85,  # %
+    'host_acceptance_rate': 78,  # %
+    'amenities': ['Wifi', 'Essentials', 'Hangers', 'Oven', 'Kitchen'],
+    'room_new_type': 'mid'
+}
+
+# 점수 계산
+response_time_score = response_time_to_score(user_input['host_response_time'])
+response_rate_score = response_rate_to_score(user_input['host_response_rate'])
+acceptance_rate_score = acceptance_rate_to_score(user_input['host_acceptance_rate'])
+common_amenity_score, type_amenity_score = calc_amenity_scores(user_input['amenities'], user_input['room_new_type'])
+
+# 결과 출력
+print(f"host_response_time_score: {response_time_score}")
+print(f"host_response_rate_score: {response_rate_score}")
+print(f"host_acceptance_rate_score: {acceptance_rate_score}")
+print(f"common_amenity_score: {common_amenity_score}")
+print(f"type_amenity_score: {type_amenity_score}")
+
+
+
+# 점수계산 함수값 이용 
+# 새로운 데이터 예시 (입력값)
+new_data = pd.DataFrame([{
+    'amenities_cnt': 12,
+    'availability_365': 200,
+    'price': 150,
+    'host_about_length_group': 'medium',  # 범주형
+    'room_type': 'Entire home/apt',       # 범주형
+    'name_length_group': 'short',         # 범주형
+    'description_length_group': 'long',   # 범주형
+    'host_has_profile_pic': 1,
+    'host_response_time_score': 0.9,
+    'type_amenity_score': 0.7,
+    'common_amenity_score': 0.6,
+    'host_acceptance_rate_score': 0.95,
+    'host_identity_verified': 1,
+    'is_long_term': 0,
+    'accommodates': 3
 }])
 
-# 예측 실행
-result_df = predict_superhost(new_data_df, model=ensemble, train_columns=X_train.columns)
+# 모델 학습 때 썼던 컬럼명 저장
+train_columns = X_encoded.columns
 
-# 결과 보기
-print(result_df[['superhost_probability', 'superhost_prediction']])
-'''
+# 입력 데이터 전처리 함수
+def preprocess_input(new_df, train_cols):
+    new_encoded = pd.get_dummies(new_df, drop_first=False)
+    # 학습 시 없던 컬럼 채우기 (0으로)
+    missing_cols = set(train_cols) - set(new_encoded.columns)
+    for c in missing_cols:
+        new_encoded[c] = 0
+    # 순서 맞추기
+    new_encoded = new_encoded[train_cols]
+    return new_encoded
+
+# 전처리
+X_new = preprocess_input(new_data, train_columns)
+
+# 예측
+pred = rf.predict(X_new)
+proba = rf.predict_proba(X_new)[:, 1]
+
+print("예측 결과 (슈퍼호스트 여부):", pred[0])  # 1이면 슈퍼호스트, 0이면 아님
+print("슈퍼호스트 확률:", round(proba[0], 3))
+
+
