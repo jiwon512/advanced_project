@@ -85,7 +85,7 @@ except FileNotFoundError:
     st.stop()
 
 st.set_page_config(layout="wide")
-st.title("🌟 Airbnb Superhost 예측기 🌟")
+st.title("🌟 Airbnb Superhost 🌟")
 st.markdown("---")
 
 st.write("**입력값은 실제 모델 학습 데이터와 1:1로 일치합니다.**")
