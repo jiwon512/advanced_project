@@ -14,7 +14,7 @@ def load_df(path):
 def load_pipeline(path):
     return joblib.load(path)
 
-DF_PATH      = "/Users/hyeom/Documents/GitHub/advanced_project/hye_project/for_machine_learning_2.csv"
+DF_PATH      = "/Users/hyeom/Documents/GitHub/advanced_project/hye_project/04_app/backup/processed_hye.csv"
 MODEL_PATH   = "/Users/hyeom/Documents/GitHub/advanced_project/hye_project/03_MachineLearning/for_app.pkl"
 
 df           = load_df(DF_PATH)
