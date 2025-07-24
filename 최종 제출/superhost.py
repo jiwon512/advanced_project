@@ -21,15 +21,13 @@ from sklearn.preprocessing import LabelEncoder
 plt.rcParams['font.family'] = 'Malgun Gothic'  
 plt.rcParams['axes.unicode_minus'] = False  
 
-csv_path = 'outlier_removed.csv'    # 여기에 absolute path
-# CSV 읽기
+csv_path = 'outlier_removed.csv'    
+
 df = pd.read_csv(
     csv_path,
-    header=0,        # 첫 줄을 컬럼명으로 사용
-    index_col='id',  # 인덱스 컬럼으로 id 지정
-    encoding='utf-8-sig'
-)
-# 데이터 확인
+    header=0,        
+    index_col='id',  
+    encoding='utf-8-sig')
 df
 
 
@@ -172,7 +170,7 @@ df['parsed_amenities'] = df['amenities'].apply(parse_amenities)
 # amenity 매칭 점수 계산 함수
 def calc_match_score(row):
     amenities = row['parsed_amenities']
-    room_type = row['room_new_type']  # ← 미리 이 컬럼 만들어져 있어야 함
+    room_type = row['room_new_type']  
     
     # 공통 어매니티 일치 비율
     common_match = sum(1 for a in amenities if a in common_amenities) / len(common_amenities)
@@ -616,8 +614,7 @@ strategy_cols = [
     'amenities_cnt', 'availability_365', 'price',
     'instant_bookable', 'host_about_length_group', 'room_type',
     'neighbourhood_group_cleansed', 'name_length_group', 'description_length_group',
-    'is_long_term', 'accommodates'
-]
+    'is_long_term', 'accommodates']
 
 trust_cols = ['host_has_profile_pic', 'host_response_time_score', 'host_acceptance_rate_score', 'host_identity_verified']
 
@@ -743,7 +740,7 @@ def calc_amenity_scores(amenities_list, room_new_type):
     return round(common_match, 3), round(type_match, 3)
 
 # 점수변환 예시 입력값
-# 사용자 입력 예시
+# 사용자 입력 예시(입력값만 변경)
 user_input = {
     'host_response_time': 'within an hour',
     'host_response_rate': 85,  # %
@@ -852,7 +849,7 @@ def plot_radar_chart(df, group_col, value_cols, title):
     plt.tight_layout()
     plt.show()
 
-# ① 시설/정보 그룹
+# 그룹
 
 facility_info_cols = ['amenities_cnt', 'common_amenity_score', 'type_amenity_score', 'accommodates', 'neighborhood_overview_exists', 'price']
 plot_radar_chart(df_super, 'room_type', facility_info_cols, 'Room Type별 시설/정보 그룹 평균 비교 (Superhost)')
