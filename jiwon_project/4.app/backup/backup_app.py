@@ -564,4 +564,28 @@ if mode == "기존 호스트":
                     st.markdown(f"- {lbl} **(+${d:,.0f})**")
                 st.success(f"예상 상승 +${cum:,.0f} ≥ 필요 +${need:,.0f}")
 
+            # ───────────────────────────────────────────────
+            # 슈퍼호스트 숙소 정보 표 추가 (연간수익 Top 10)
+            st.markdown("---")
+            st.subheader("해당 동네 슈퍼호스트 숙소 정보 (Top 10 연간수익)")
+            df_super = occ_df[
+                (occ_df['neighbourhood_group_cleansed'] == profile['neighbourhood_group_cleansed']) &
+                (occ_df['neigh_cluster_reduced'] == profile['neigh_cluster_reduced']) &
+                (occ_df['host_is_superhost'] == 1) &
+                (occ_df['is_activate'] == 1)
+            ].copy()
+            if 'log_price' in df_super.columns:
+                df_super['1박당 가격'] = np.expm1(df_super['log_price']).round(0).astype(int)
+            if 'estimated_occupancy_l365d' in df_super.columns and '1박당 가격' in df_super.columns:
+                df_super['연간수익'] = (df_super['1박당 가격'] * df_super['estimated_occupancy_l365d']).round(0).astype(int)
+            show_cols = ['1박당 가격', 'beds', 'amenities_cnt', 'tourism_count', 'infrastructure_count', 'amenity_group', '연간수익']
+            show_cols = [col for col in show_cols if col in df_super.columns]
+            if show_cols and not df_super.empty:
+                df_super = df_super.sort_values('연간수익', ascending=False).head(10)
+                st.markdown("<div style='display:flex; justify-content:center;'>", unsafe_allow_html=True)
+                st.table(df_super[show_cols].reset_index(drop=True))
+                st.markdown("</div>", unsafe_allow_html=True)
+            else:
+                st.info("해당 동네의 슈퍼호스트 숙소 정보가 없습니다.")
+
 # ───────────────────────────────────────────────────────────────
