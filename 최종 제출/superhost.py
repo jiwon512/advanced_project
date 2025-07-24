@@ -325,12 +325,10 @@ print(importances.sort_values(ascending=False).round(3))
 
 
 # 슈퍼호스트여부 판별 예측 모델링 
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, roc_auc_score
 
 # 1. 목표 변수 설정
 TARGET = 'host_is_superhost'
+y = df[TARGET].astype(int)
 
 # === 변수 목록 정의 ===
 
