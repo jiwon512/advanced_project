@@ -13,6 +13,9 @@ import scipy.stats as stats
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import platform
+import joblib
+from sklearn.pipeline import Pipeline
+
 
 plt.rcParams['font.family'] = 'Malgun Gothic'  
 plt.rcParams['axes.unicode_minus'] = False  
@@ -715,7 +718,7 @@ print(f"type_amenity_score: {type_amenity_score}")
 
 
 # 점수계산 함수값 이용 
-# 새로운 데이터 예시 (입력값)
+# 새로운 데이터 예시 (입력값만 변경)
 new_data = pd.DataFrame([{
     'amenities_cnt': 12,
     'availability_365': 200,

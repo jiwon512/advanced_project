@@ -1,31 +1,9 @@
 
 import streamlit as st
 import pandas as pd
-import numpy as np
 import joblib
-import re
 
-# --- 1. 데이터 및 모델 로드 ---
-@st.cache_data
-def load_pipeline(path):
-    """지정된 경로에서 모델 파이프라인을 로드합니다."""
-    try:
-        pipeline = joblib.load(path)
-        return pipeline
-    except Exception as e:
-        st.error(f"모델 파이프라인 로드 실패: {e}")
-        return None
-
-# 모델 파일 경로 (실제 경로에 맞게 수정해주세요)
-MODEL_PATH = 'superhost_pipeline_rf.pkl'
-pipeline = load_pipeline(MODEL_PATH)
-
-if pipeline is None:
-    st.stop() # 모델 로드 실패 시 앱 중단
-
-# --- 2. 원시 데이터를 모델 입력 피처로 변환하는 유틸리티 함수 ---
-
-# 1. host_response_time → 점수 변환 함수
+# --- 점수 변환 함수들 ---
 def response_time_to_score(response_time_str):
     mapping = {
         'within an hour': 4,
@@ -35,10 +13,7 @@ def response_time_to_score(response_time_str):
     }
     return mapping.get(response_time_str.lower(), 0)
 
-# 2. host_acceptance_rate(0~100) → 점수 변환 함수
-def acceptance_rate_to_score(rate_percent):
-    if pd.isna(rate_percent) or rate_percent < 0 or rate_percent > 100:
-        return 0
+def response_rate_to_score(rate_percent):
     rate = rate_percent / 100
     if rate <= 0.25:
         return 1
@@ -49,9 +24,18 @@ def acceptance_rate_to_score(rate_percent):
     else:
         return 4
 
-# 3. amenities 점수 계산 함수
-common_amenities = ['Carbon monoxide alarm', 'Essentials', 'Hangers', 'Smoke alarm', 'Wifi']
+def acceptance_rate_to_score(rate_percent):
+    rate = rate_percent / 100
+    if rate <= 0.25:
+        return 1
+    elif rate <= 0.5:
+        return 2
+    elif rate <= 0.75:
+        return 3
+    else:
+        return 4
 
+common_amenities = ['Carbon monoxide alarm', 'Essentials', 'Hangers', 'Smoke alarm', 'Wifi']
 type_amenity_dict = {
     'high': ['Air conditioning', 'Building staff', 'Elevator', 'Gym', 'Heating', 'Paid parking off premises', 'Shampoo'],
     'low-mid': ['Cleaning products', 'Dining table', 'Exterior security cameras on property', 'Free street parking',
@@ -61,177 +45,152 @@ type_amenity_dict = {
 }
 
 def calc_amenity_scores(amenities_list, room_new_type):
-    if not amenities_list:
-        return 0.0, 0.0
-
-    cleaned_amenities = [re.sub(r'[\uD800-\uDFFF]', '', a).strip().lower() for a in amenities_list]
-
-    cleaned_common_amenities = [re.sub(r'[\uD800-\uDFFF]', '', a).strip().lower() for a in common_amenities]
-    common_match_count = sum(1 for a in cleaned_amenities if a in cleaned_common_amenities)
-    common_score = common_match_count / len(cleaned_common_amenities) if cleaned_common_amenities else 0
-
+    common_match = sum(1 for a in amenities_list if a in common_amenities) / len(common_amenities) if common_amenities else 0
     type_amenities = type_amenity_dict.get(room_new_type, [])
-    cleaned_type_amenities = [re.sub(r'[\uD800-\uDFFF]', '', a).strip().lower() for a in type_amenities]
-    type_match_count = sum(1 for a in cleaned_amenities if a in cleaned_type_amenities)
-    type_score = type_match_count / len(cleaned_type_amenities) if cleaned_type_amenities else 0
+    type_match = sum(1 for a in amenities_list if a in type_amenities) / len(type_amenities) if type_amenities else 0
+    return round(common_match, 3), round(type_match, 3)
 
-    return round(common_score, 3), round(type_score, 3)
+# --- 모델 불러오기 ---
+try:
+    # 모델 파일이 현재 스크립트와 같은 디렉토리에 있다고 가정합니다.
+    # 만약 다른 경로라면 'C:/Users/HY/Documents/GitHub/advanced_project/hayoung/3/superhost_pipeline_rf.pkl' 처럼 절대 경로를 다시 지정해야 합니다.
+    pipeline = joblib.load('superhost_pipeline_rf.pkl')
+    # pipeline에서 실제 train_columns를 추출할 수 있다면 더 좋습니다 (예: pipeline.named_steps['preprocessor'].get_feature_names_out())
+    # 하지만 여기서는 입력 DataFrame이 pipeline에 바로 들어가는 형태이므로, 컬럼명은 데이터프레임 생성 시 맞춰주면 됩니다.
+except FileNotFoundError:
+    st.error("오류: 'superhost_pipeline_rf.pkl' 모델 파일을 찾을 수 없습니다. 경로를 확인하거나 파일을 스크립트와 같은 디렉토리에 두세요.")
+    st.stop() # 파일이 없으면 앱 실행 중지
 
-# 4. 길이 그룹화 함수들 (수정됨: 'short'으로 통일)
-def get_name_length_group(length):
-    """숙소 이름 길이를 그룹화합니다. (mid: 38)"""
-    if length == 0:
-        return '없음'
-    elif length > 38:
-        return 'long'
-    else:
-        return 'short' # 'short_or_mid' -> 'short'
+st.set_page_config(layout="wide") # 페이지 레이아웃을 넓게 설정
+st.title("🌟 Airbnb Superhost 🌟")
+st.markdown("---") # 구분선 추가
 
-def get_description_length_group(length):
-    """숙소 상세 설명 길이를 그룹화합니다. (avg: 359)"""
-    if length == 0:
-        return '없음'
-    elif length > 359:
-        return 'long'
-    else:
-        return 'short' # 'short_or_avg' -> 'short'
+st.write("**당신의 숙소와 호스트 정보를 입력하여 슈퍼호스트가 될 가능성을 예측해보세요!**")
+st.info("💡 슈퍼호스트는 에어비앤비의 특정 기준(응답률, 수락률, 평점, 예약 건수 등)을 충족해야 부여되는 자격입니다.")
 
-def get_host_about_length_group(length):
-    """호스트 소개글 길이를 그룹화합니다. (mid: 81)"""
-    if length == 0:
-        return '없음'
-    elif length > 81:
-        return 'long'
-    else:
-        return 'short' # 'short_or_mid' -> 'short'
-
-# --- 3. 예측 함수 정의 ---
-def predict_superhost(input_data_dict: dict, pipeline) -> tuple:
-    """
-    단일 입력 딕셔너리를 받아 슈퍼호스트 여부를 예측하고 확률을 반환합니다.
-    주의: input_data_dict는 모델 학습 시 사용된 strategy_cols와 동일한 키를 포함해야 합니다.
-    """
-    strategy_cols = [
-        'amenities_cnt', 'availability_365', 'price', 'host_about_length_group',
-        'room_type', 'name_length_group', 'description_length_group',
-        'host_has_profile_pic', 'host_response_time_score', 'type_amenity_score',
-        'common_amenity_score', 'host_acceptance_rate_score',
-        'host_identity_verified', 'is_long_term', 'accommodates'
+def main():
+    st.header("🏠 숙소 정보")
+    
+    # 숙소 정보 입력 위젯들
+    room_new_type = st.selectbox("숙소 가격대 그룹", ['high', 'low-mid', 'mid', 'upper-mid'], index=2, help="숙소의 대략적인 가격대. 'mid'가 슈퍼호스트에게 선호되는 경향이 있습니다.")
+    room_type = st.selectbox("숙소 유형", ['Entire home/apt', 'Private room', 'Shared room', 'Hotel room'], index=0, help="'Entire home/apt'(집 전체/아파트)가 슈퍼호스트에게 유리합니다.")
+    
+    # 모든 가능한 편의시설을 리스트로 합치기 (다양한 편의시설을 추가하여 기본값을 높임)
+    all_possible_amenities = sorted(list(set(common_amenities +
+                                          type_amenity_dict['high'] +
+                                          type_amenity_dict['low-mid'] +
+                                          type_amenity_dict['mid'] +
+                                          type_amenity_dict['upper-mid'] +
+                                          ['TV', 'Dryer', 'Washer', 'Dishwasher', 'Coffee maker', 'Toaster', 'Iron', 'Hair dryer',
+                                           'Bed linens', 'Extra pillows and blankets', 'First aid kit', 'Fire extinguisher', 'Locker',
+                                           'Pillow', 'Laptop friendly workspace', 'Hot water', 'Heating', 'Air conditioning', 'Shampoo', 'Cooking basics', 'Kitchen', 'Oven',
+                                           'Essentials', 'Hangers', 'Smoke alarm', 'Wifi', 'Carbon monoxide alarm' # 중복 방지
+                                          ])))
+    
+    # 기본 선택될 편의시설 설정 (슈퍼호스트에 유리한 조건으로 최대한 많이 선택)
+    default_amenities = [
+        'Carbon monoxide alarm', 'Essentials', 'Hangers', 'Smoke alarm', 'Wifi', # 공통 필수
+        'Cooking basics', 'Kitchen', 'Oven', # mid 타입 필수
+        'Air conditioning', 'Heating', 'Shampoo', # high/mid/upper-mid
+        'TV', 'Dryer', 'Washer', 'Dishwasher', 'Coffee maker', 'Toaster', 'Iron', 'Hair dryer',
+        'Bed linens', 'Extra pillows and blankets', 'First aid kit', 'Fire extinguisher', 'Locker',
+        'Pillow', 'Laptop friendly workspace', 'Hot water' # 기타 중요
     ]
+    # 실제 존재하는 옵션들만 기본값으로 설정
+    default_amenities = [a for a in default_amenities if a in all_possible_amenities]
 
-    try:
-        X_new = pd.DataFrame([input_data_dict])[strategy_cols]
-    except KeyError as e:
-        st.error(f"입력 데이터에 필수 컬럼이 누락되었습니다: {e}. 모든 'strategy_cols'를 포함해야 합니다.")
-        return None, None
 
-    pred = pipeline.predict(X_new)[0]
-    proba = pipeline.predict_proba(X_new)[0, 1] # 슈퍼호스트(클래스 1)일 확률
-
-    return pred, proba
-
-# --- 4. Streamlit 앱 UI 구성 ---
-st.set_page_config(layout="wide")
-st.title("🌟 Airbnb 슈퍼호스트 예측 도우미")
-
-st.markdown("""
-이 앱은 입력된 숙소 정보를 바탕으로 해당 숙소가 슈퍼호스트의 조건을 만족할 가능성을 예측합니다.
-""")
-
-st.subheader("🏡 숙소 정보 입력")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.markdown("##### 기본 정보")
-    amenities_cnt = st.number_input("편의시설 개수", min_value=0, max_value=50, value=15)
-    availability_365 = st.slider("1년 중 예약 가능 일수", min_value=0, max_value=365, value=180)
-    price = st.number_input("1박 요금 ($)", min_value=10, max_value=1000, value=100)
-    accommodates = st.number_input("최대 숙박 인원", min_value=1, max_value=16, value=2)
-
-    st.markdown("##### 호스트 정보")
-    host_has_profile_pic = st.selectbox("호스트 프로필 사진 유무", [True, False], format_func=lambda x: "있음" if x else "없음")
-    host_identity_verified = st.selectbox("호스트 신원 인증 여부", [True, False], format_func=lambda x: "인증됨" if x else "미인증")
-    host_response_time_raw = st.selectbox(
-        "호스트 응답 시간",
-        ['within an hour', 'within a few hours', 'within a day', 'a few days or more', 'N/A']
+    selected_amenities = st.multiselect(
+        "제공하는 편의시설을 선택하세요 (다중 선택 가능)",
+        options=all_possible_amenities,
+        default=default_amenities, # 기본으로 선택될 값 조정
+        help=f"**슈퍼호스트는 평균 37개 이상의 편의시설을 제공합니다.** 현재 선택된 개수: {len(default_amenities)}개."
     )
-    host_acceptance_rate_raw = st.slider("호스트 수락률 (%)", min_value=0, max_value=100, value=85)
+    amenities_cnt = len(selected_amenities) # 선택된 편의시설 개수를 자동으로 반영
+    st.write(f"➡️ 선택된 편의시설 개수: **{amenities_cnt}**")
 
-with col2:
-    st.markdown("##### 숙소 특징")
-    room_type = st.selectbox("룸 타입", ['Entire home/apt', 'Private room', 'Shared room', 'Hotel room'])
-    is_long_term = st.selectbox("장기 숙박 허용 여부", [True, False], format_func=lambda x: "허용" if x else "불허")
+    availability_365 = st.number_input("연간 예약 가능일 수 (최대 365일)", min_value=0, max_value=365, value=300, help="1년 중 숙소를 예약 가능한 일수. 슈퍼호스트는 평균 233일 이상으로 높은 가용성을 보입니다.") # 300으로 변경
+    price = st.number_input("1박당 가격 ($)", min_value=0, value=110, help="숙소의 1박당 가격. 슈퍼호스트는 평균 $129보다 약간 낮은 가격대를 유지하는 경향이 있습니다.") # 110으로 변경
+    accommodates = st.number_input("최대 수용 인원", min_value=1, value=2, help="숙소에서 수용 가능한 최대 게스트 수. 2명 수용 숙소가 중앙값입니다.") # 2로 변경
 
-    # 길이 그룹화를 위한 원시 길이 입력 필드 추가
-    st.markdown("##### 길이 정보")
-    host_about_length_input = st.number_input("호스트 소개글 길이 (글자 수)", min_value=0, value=100)
-    name_length_input = st.number_input("숙소 이름 길이 (글자 수)", min_value=0, value=20)
-    description_length_input = st.number_input("숙소 상세 설명 길이 (글자 수)", min_value=0, value=500)
-
-    st.markdown("##### 편의시설 정보")
-    all_amenities_options = [
-        'Wifi', 'Essentials', 'Hangers', 'Smoke alarm', 'Carbon monoxide alarm', 'Air conditioning',
-        'Heating', 'Kitchen', 'Oven', 'Microwave', 'Shampoo', 'Bathtub', 'Elevator', 'Gym',
-        'Free parking', 'Paid parking off premises', 'Cleaning products', 'Dining table',
-        'Exterior security cameras on property', 'Freezer', 'Laundromat nearby', 'Lock on bedroom door',
-        'Cooking basics', 'Dishes and silverware', 'Building staff'
-    ]
-    selected_amenities_raw = st.multiselect("주요 편의시설 선택 (슈퍼호스트 관련 편의시설 기준)", all_amenities_options,
-                                            default=['Wifi', 'Essentials', 'Hangers', 'Smoke alarm', 'Kitchen', 'Oven'])
-    room_new_type_for_amenity_score = st.selectbox(
-        "숙소 타입 (편의시설 점수 계산용)", ['mid', 'high', 'low-mid', 'upper-mid']
-    )
+    st.header("👤 호스트 및 숙소 정보 상세")
+    
+    host_response_time = st.selectbox("호스트 응답 시간", ['within an hour', 'within a few hours', 'within a day', 'a few days or more'], index=0, help="게스트 문의에 대한 응답 시간. **1시간 이내**가 슈퍼호스트의 핵심 요건입니다.")
+    host_response_rate = st.slider("호스트 응답률 (%)", 0, 100, 100, help="게스트 문의에 응답한 비율. **100%**를 유지하는 것이 매우 중요합니다.") # 100으로 변경
+    host_acceptance_rate = st.slider("호스트 수락률 (%)", 0, 100, 100, help="예약 요청을 수락한 비율. **100%**에 가까울수록 좋습니다.") # 100으로 변경
+    
+    host_about_length_group = st.selectbox("호스트 소개글 길이", ['short', 'medium', 'long'], index=2, help="프로필 소개글의 길이. **길고 상세한 소개글**이 신뢰도를 높여줍니다.") # long (index=2)
+    name_length_group = st.selectbox("숙소 이름 길이", ['short', 'medium', 'long'], index=2, help="숙소 이름의 길이. **길고 명확한 이름**이 숙소의 매력을 더 잘 전달합니다.") # long (index=2)
+    description_length_group = st.selectbox("숙소 설명 길이", ['short', 'medium', 'long'], index=2, help="숙소 상세 설명의 길이. **길고 자세한 설명**이 게스트의 이해를 돕고 만족도를 높입니다.") # long (index=2)
+    
+    host_has_profile_pic = st.radio("프로필 사진 유무", [1, 0], format_func=lambda x: "있음" if x == 1 else "없음", index=0, help="프로필 사진 유무. **거의 모든 슈퍼호스트는 프로필 사진을 가지고 있습니다.**")
+    host_identity_verified = st.radio("호스트 신원 인증", [1, 0], format_func=lambda x: "예" if x == 1 else "아니오", index=0, help="에어비앤비에서 신원 인증을 했는지 여부. **인증된 호스트**가 더 신뢰를 얻습니다.")
+    is_long_term = st.radio("장기 숙박 가능 여부", [0, 1], format_func=lambda x: "아니오" if x == 0 else "예", index=0, help="장기 임대보다 **단기 숙박 중심**으로 운영하는 것이 슈퍼호스트 자격에 유리합니다.")
 
 
-# 예측 버튼
-if st.button("슈퍼호스트 가능성 예측하기"):
-    # 1. 원시 입력 데이터를 점수화 및 가공
-    host_response_time_score = response_time_to_score(host_response_time_raw)
-    host_acceptance_rate_score = acceptance_rate_to_score(host_acceptance_rate_raw)
-    common_amenity_score, type_amenity_score = calc_amenity_scores(
-        selected_amenities_raw, room_new_type_for_amenity_score
-    )
+    st.markdown("---")
+    if st.button("✨ 슈퍼호스트 확률 예측하기 ✨"):
+        # --- 점수 계산 ---
+        response_time_score = response_time_to_score(host_response_time)
+        response_rate_score = response_rate_to_score(host_response_rate)
+        acceptance_rate_score = acceptance_rate_to_score(host_acceptance_rate)
+        common_amenity_score, type_amenity_score = calc_amenity_scores(selected_amenities, room_new_type)
 
-    # 새로 정의한 길이 그룹화 함수 적용 (이제 'short'으로 통일)
-    host_about_length_group = get_host_about_length_group(host_about_length_input)
-    name_length_group = get_name_length_group(name_length_input)
-    description_length_group = get_description_length_group(description_length_input)
+        # --- 예측을 위한 DataFrame 생성 ---
+        input_data_dict = {
+            'amenities_cnt': amenities_cnt,
+            'availability_365': availability_365,
+            'price': price,
+            'host_about_length_group': host_about_length_group, # 범주형
+            'room_type': room_type,                               # 범주형
+            'name_length_group': name_length_group,               # 범주형
+            'description_length_group': description_length_group, # 범주형
+            'host_has_profile_pic': host_has_profile_pic,
+            'host_response_time_score': response_time_score,
+            'type_amenity_score': type_amenity_score,
+            'common_amenity_score': common_amenity_score,
+            'host_acceptance_rate_score': acceptance_rate_score,
+            'host_identity_verified': host_identity_verified,
+            'is_long_term': is_long_term,
+            'accommodates': accommodates
+        }
+        
+        new_data_df = pd.DataFrame([input_data_dict])
 
 
-    # 2. 모델 예측에 필요한 최종 딕셔너리 구성
-    input_for_prediction = {
-        'amenities_cnt': amenities_cnt,
-        'availability_365': availability_365,
-        'price': price,
-        'host_about_length_group': host_about_length_group,
-        'room_type': room_type,
-        'name_length_group': name_length_group,
-        'description_length_group': description_length_group,
-        'host_has_profile_pic': host_has_profile_pic,
-        'host_response_time_score': host_response_time_score,
-        'type_amenity_score': type_amenity_score,
-        'common_amenity_score': common_amenity_score,
-        'host_acceptance_rate_score': host_acceptance_rate_score,
-        'host_identity_verified': host_identity_verified,
-        'is_long_term': is_long_term,
-        'accommodates': accommodates
-    }
+        # --- 예측 실행 ---
+        try:
+            pred = pipeline.predict(new_data_df)
+            proba = pipeline.predict_proba(new_data_df)[:, 1]
 
-    # 3. 예측 함수 호출
-    prediction, probability = predict_superhost(input_for_prediction, pipeline)
+            st.subheader("💡 예측 결과")
+            if pred[0] == 1:
+                st.success(f"🎉 **당신은 슈퍼호스트가 될 가능성이 매우 높습니다!**")
+                st.markdown(f"**예측 확률: <span style='color:green; font-size:2em;'>{round(proba[0]*100, 2)}%</span>**", unsafe_allow_html=True)
+            else:
+                st.warning(f"🤔 **아쉽지만 현재 조건으로는 슈퍼호스트가 아닐 가능성이 높습니다.**")
+                st.markdown(f"**예측 확률: <span style='color:orange; font-size:2em;'>{round(proba[0]*100, 2)}%</span>**", unsafe_allow_html=True)
+            
+            st.markdown("""
+            <br>
+            <p><strong>슈퍼호스트가 되기 위한 핵심 요건:</strong></p>
+            <ul>
+                <li>✔️ **응답률 90% 이상 & 응답 시간 1시간 이내:** 게스트 문의에 빠르게 응답하세요.</li>
+                <li>✔️ **수락률 90% 이상:** 예약 요청을 적극적으로 수락하세요.</li>
+                <li>✔️ **높은 평점:** 종합 평점 4.8점 이상 유지를 목표로 하세요.</li>
+                <li>✔️ **많은 예약 건수:** 10건 이상의 숙박 완료 및 게스트 수용이 필요합니다.</li>
+                <li>✔️ **다양한 편의시설:** 게스트 편의를 위한 필수 편의시설과 추가 시설을 완비하세요.</li>
+                <li>✔️ **상세하고 매력적인 숙소 및 호스트 정보:** 사진과 설명을 충분히 제공하여 신뢰를 얻으세요.</li>
+            </ul>
+            """, unsafe_allow_html=True)
 
-    # 4. 결과 표시
-    st.subheader("📊 예측 결과")
-    if prediction is not None:
-        if prediction == 1:
-            st.success(f"이 숙소는 슈퍼호스트가 될 가능성이 높습니다! (확률: **{probability:.2%}**)")
-        else:
-            st.info(f"이 숙소는 현재 슈퍼호스트가 아닐 가능성이 높습니다. (확률: **{1-probability:.2%}**)")
+        except Exception as e:
+            st.error(f"예측 중 오류가 발생했습니다. 입력 데이터 형식을 확인해주세요: {e}")
+            st.write("입력된 데이터의 컬럼과 모델 학습 시의 컬럼이 일치하는지 확인이 필요합니다.")
+            # 디버깅을 위해 입력 데이터프레임 구조를 출력
+            # st.write("입력 데이터 DataFrame:")
+            # st.write(new_data_df)
 
-        st.progress(probability, text=f"슈퍼호스트가 될 확률: {probability:.2%}")
 
-        st.markdown("""
-        ---
-        **참고:** 이 예측은 입력된 정보와 학습된 모델을 기반으로 합니다. 실제 결과는 다를 수 있습니다.
-        """)
+if __name__ == "__main__":
+    main()
