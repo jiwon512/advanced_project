@@ -24,7 +24,7 @@ bin_cols = [
 other_flags = ['grp01_high','grp04_high']
 features = cat_cols + num_cols + bin_cols + other_flags
 
-DATA_PATH = "/Users/Jiwon/Documents/GitHub/advanced_project/jiwon_project/4.app/backup/processed_hye.csv"
+DATA_PATH = "/Users/Jiwon/Documents/GitHub/advanced_project/hye_project/04_app/backup/processed_hye.csv"
 df = pd.read_csv(DATA_PATH)
 
 X = df[features]
@@ -33,7 +33,7 @@ X_tr, X_val, y_tr, y_val = train_test_split(
     X, y, test_size=0.2, stratify=df['room_type_ord'], random_state=42
 )
 
-# CatBoost 파라미터 직접 지정
+# CatBoost 파라미터 직접 지정 (optuna 없이!)
 cat_params = {
     "iterations": 500,
     "learning_rate": 0.05,
@@ -49,7 +49,7 @@ cat_pipeline = Pipeline([
     ('cb', CatBoostRegressor(**cat_params))
 ])
 
-# HGB 파라미터 직접 지정
+# HGB 파라미터 직접 지정 (optuna 없이!)
 preprocessor = ColumnTransformer([
     ('ord', OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1), cat_cols)
 ], remainder='passthrough')
