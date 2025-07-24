@@ -2,16 +2,17 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+import xgboost
 import re
 
 # ====== 1. 경로/피처리스트/데이터 로드 ======
 # 가격 예측 모델
-PRICE_MODEL_PATH = "/Users/Jiwon/Documents/GitHub/advanced_project/jiwon_price.pkl"
-PRICE_DF_PATH = "/Users/Jiwon/Documents/GitHub/advanced_project/jiwon_project/4.app/backup/processed_hye.csv"
+PRICE_MODEL_PATH = "/Users/hyeom/Documents/GitHub/advanced_project/jiwon_price.pkl"
+PRICE_DF_PATH = "/Users/hyeom/Documents/GitHub/advanced_project/jiwon_project/4.app/backup/processed_hye.csv"
 
 # occupancy 예측 모델
-OCC_MODEL_PATH = "/Users/Jiwon/Documents/GitHub/advanced_project/jiwon_project/occupancy_voting_model.pkl"
-OCC_DF_PATH = "/Users/Jiwon/Documents/GitHub/advanced_project/jiwon_project/presentation/jiwon_entire.csv"
+OCC_MODEL_PATH = "/Users/hyeom/Documents/GitHub/advanced_project/occupancy_voting_model.pkl"
+OCC_DF_PATH = "/Users/hyeom/Documents/GitHub/advanced_project/jiwon_project/presentation/jiwon_entire.csv"
 
 # 가격 예측 피처리스트 (backup_app.py의 hye_features)
 cat_cols = ['neigh_cluster_reduced','neighbourhood_group_cleansed','room_type_ord','room_new_type_ord','room_structure_type','amen_grp','description_length_group','name_length_group']
@@ -32,9 +33,11 @@ occ_cols = [
 # 데이터/모델 로드
 @st.cache_data
 def load_df(path):
+    import xgboost
     return pd.read_csv(path)
 @st.cache_resource
 def load_model(path):
+    import xgboost
     return joblib.load(path)
 price_df = load_df(PRICE_DF_PATH)
 occ_df = load_df(OCC_DF_PATH)
